@@ -17,8 +17,8 @@ const MentalHealthChatInputSchema = z.object({
 });
 export type MentalHealthChatInput = z.infer<typeof MentalHealthChatInputSchema>;
 
-// Simplified flat output schema — no nested objects for the response text
-const MentalHealthChatOutputSchema = z.object({
+// Strict schema for LLM generation (all fields required)
+const GenerationSchema = z.object({
     responseText: z.string().describe("Aura's empathetic, conversational reply to the student."),
     riskAssessment: z.enum(["No Risk", "At Risk", "High Risk"]).describe("Background risk level assessment."),
     anxietyLevel: z.enum(["Low", "Moderate", "High", "Not Assessed"]).describe("Assessed anxiety level."),
@@ -27,11 +27,17 @@ const MentalHealthChatOutputSchema = z.object({
     counselorNotes: z.string().describe("Brief observations for the counselor."),
 });
 
-export interface MentalHealthChatOutput {
-    responseText?: string;
-    riskAssessment?: string;
-    error?: string;
-}
+// Loose schema for Flow output (fields optional to allow error handling)
+const MentalHealthChatOutputSchema = z.object({
+    responseText: z.string().optional(),
+    riskAssessment: z.enum(["No Risk", "At Risk", "High Risk"]).optional(),
+    anxietyLevel: z.enum(["Low", "Moderate", "High", "Not Assessed"]).optional(),
+    moodState: z.string().optional(),
+    cognitivePatterns: z.array(z.string()).optional(),
+    counselorNotes: z.string().optional(),
+    error: z.string().optional(),
+});
+export type MentalHealthChatOutput = z.infer<typeof MentalHealthChatOutputSchema>;
 
 const SYSTEM_INSTRUCTIONS = `You are Aura, an AI assistant trained in supportive conversational techniques inspired by principles of psychotherapy (like active listening, Socratic questioning, and cognitive-behavioral frameworks). Your goal is to provide a safe, structured, and reflective space for users to explore their thoughts and feelings.
 
@@ -59,7 +65,8 @@ Your "responseText" field must contain your natural, empathetic, conversational 
 `;
 
 export async function mentalHealthChat(input: MentalHealthChatInput): Promise<MentalHealthChatOutput> {
-    return mentalHealthChatFlow(input);
+    const output = await mentalHealthChatFlow(input);
+    return output;
 }
 
 const mentalHealthChatFlow = ai.defineFlow(
@@ -104,7 +111,7 @@ const mentalHealthChatFlow = ai.defineFlow(
                 model: 'googleai/gemini-2.0-flash',
                 messages: [...formattedHistory, formattedNewMessage],
                 system: systemPrompt,
-                output: { schema: MentalHealthChatOutputSchema },
+                output: { schema: GenerationSchema },
             });
 
             if (!output || !output.responseText) {
@@ -118,6 +125,10 @@ const mentalHealthChatFlow = ai.defineFlow(
             return {
                 responseText: output.responseText,
                 riskAssessment: output.riskAssessment,
+                anxietyLevel: output.anxietyLevel,
+                moodState: output.moodState,
+                cognitivePatterns: output.cognitivePatterns,
+                counselorNotes: output.counselorNotes,
             };
         } catch (e: any) {
             console.error('Error in mentalHealthChatFlow:', e);

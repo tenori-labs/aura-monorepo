@@ -38,7 +38,15 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Define protected and auth-only routes
-    const protectedRoutes = ["/dashboard", "/charts"];
+    const protectedRoutes = [
+        "/dashboard",
+        "/admin-dashboard",
+        "/faculty-dashboard",
+        "/report-incident",
+        "/well-being",
+        "/consent-form",
+        "/charts",
+    ];
     const authRoutes = ["/login", "/signup"];
 
     const pathname = request.nextUrl.pathname;
