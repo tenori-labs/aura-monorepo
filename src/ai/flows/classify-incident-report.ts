@@ -18,8 +18,8 @@
  * @exports ClassifyIncidentReportOutput - The output type for the classifyIncidentReport function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 /**
  * Input schema for classifying incident reports.
@@ -60,6 +60,14 @@ const ClassifyIncidentReportOutputSchema = z.object({
   keywords: z
     .array(z.string())
     .describe('Keywords extracted from the incident report text and/or image.'),
+  validity: z
+    .enum(['Likely Valid', 'Needs Review', 'Invalid'])
+    .describe(
+      'Assessment of whether the report appears to be a genuine incident or spam/irrelevant.'
+    ),
+  validityReason: z
+    .string()
+    .describe('A brief explanation for the validity assessment.'),
 });
 
 /**
@@ -82,11 +90,19 @@ export async function classifyIncidentReport(
 
 const classifyIncidentReportPrompt = ai.definePrompt({
   name: 'classifyIncidentReportPrompt',
-  input: {schema: ClassifyIncidentReportInputSchema},
-  output: {schema: ClassifyIncidentReportOutputSchema},
+  input: { schema: ClassifyIncidentReportInputSchema },
+  output: { schema: ClassifyIncidentReportOutputSchema },
   prompt: `You are an AI assistant that classifies incident reports based on their text content and an optional attached image.
 
-  Analyze the following incident report and determine the most appropriate category, a confidence score (between 0 and 1), and extract relevant keywords from both the text and the image if provided.
+  Analyze the following incident report. determine:
+  1. The most appropriate category.
+  2. A confidence score (between 0 and 1).
+  3. Relevant keywords from both the text and the image if provided.
+  4. The validity of the report ('Likely Valid', 'Needs Review', 'Invalid').
+     - 'Likely Valid': Describes a plausible incident relevant to safety, maintenance, or conduct.
+     - 'Needs Review': Ambiguous, lacks detail, or potentially borderline.
+     - 'Invalid': Obvious spam, nonsense, testing data, or completely irrelevant topics.
+  5. A brief reason for your validity assessment.
 
   Report Text: {{{reportText}}}
   
@@ -95,7 +111,7 @@ const classifyIncidentReportPrompt = ai.definePrompt({
   Analyze the image for context, objects, and actions relevant to the report.
   {{/if}}
 
-  Respond with a JSON object containing the category, confidence score, and keywords.
+  Respond with a JSON object containing the category, confidence score, keywords, validity, and validityReason.
   `,
 });
 
@@ -109,7 +125,7 @@ const classifyIncidentReportFlow = ai.defineFlow(
     outputSchema: ClassifyIncidentReportOutputSchema,
   },
   async input => {
-    const {output} = await classifyIncidentReportPrompt(input);
+    const { output } = await classifyIncidentReportPrompt(input);
     return output!;
   }
 );
