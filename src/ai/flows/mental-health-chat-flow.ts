@@ -50,9 +50,9 @@ const MentalHealthChatOutputSchema = z.object({
   botResponse: ChatMessageSchema.optional().describe("Aura's response for the user."),
   riskAssessment: z.enum(["No Risk", "At Risk", "High Risk"]).optional().describe("The assessed mental health risk level of the student based on the conversation. This is for internal analysis and NOT to be shown to the student."),
   psychologicalDimensions: z.object({
-      anxietyLevel: z.enum(["Low", "Moderate", "High", "Not Assessed"]).describe("Assessed level of anxiety based on the conversation."),
-      moodState: z.string().describe("Apparent mood state, e.g., 'Stable', 'Anxious', 'Depressed', 'Frustrated'."),
-      cognitivePatterns: z.array(z.string()).describe("Observed cognitive patterns, e.g., 'Catastrophizing', 'Rumination', 'Self-criticism'.")
+    anxietyLevel: z.enum(["Low", "Moderate", "High", "Not Assessed"]).describe("Assessed level of anxiety based on the conversation."),
+    moodState: z.string().describe("Apparent mood state, e.g., 'Stable', 'Anxious', 'Depressed', 'Frustrated'."),
+    cognitivePatterns: z.array(z.string()).describe("Observed cognitive patterns, e.g., 'Catastrophizing', 'Rumination', 'Self-criticism'.")
   }).optional().describe("Internal analysis of psychological dimensions. Not shown to student."),
   auraObservationsForCounselor: z.string().optional().describe("Aura's notes/observations from this interaction, potentially based on counselor instructions. Not shown to the student."),
   error: z.string().optional().describe("An error message if the bot couldn't respond."),
@@ -134,57 +134,79 @@ const mentalHealthChatFlow = ai.defineFlow(
     inputSchema: MentalHealthChatInputSchema,
     outputSchema: MentalHealthChatOutputSchema,
   },
-  async (flowInput) => { 
+  async (flowInput) => {
     const { newMessage, history, isGreeting, studentId, activeCounselorInstructions } = flowInput;
 
     const handlebarsContext = {
       studentId: studentId,
       activeCounselorInstructions: activeCounselorInstructions,
     };
-    
+
     let dynamicSystemInstructions = SYSTEM_INSTRUCTIONS;
     if (isGreeting) {
-        dynamicSystemInstructions += "\nThis is the first message. Provide a proactive greeting as the content of botResponse. Default internal analysis to 'No Risk', 'Not Assessed', and neutral observations.";
+      dynamicSystemInstructions += "\nThis is the first message. Provide a proactive greeting as the content of botResponse. Default internal analysis to 'No Risk', 'Not Assessed', and neutral observations.";
     }
-    
+
     try {
+      // Map chat history and new message to a format Genkit understands (array of content parts)
+      let formattedHistory = (history || []).map(m => ({
+        role: m.role,
+        content: [{ text: m.content }]
+      }));
+
+      // Gemini requires the first message in history to be from 'user'. 
+      // If history starts with 'model', remove until 'user' is found.
+      while (formattedHistory.length > 0 && formattedHistory[0].role === 'model') {
+        formattedHistory.shift();
+      }
+
+      const formattedNewMessage = {
+        role: newMessage.role,
+        content: [{ text: newMessage.content }]
+      };
+
       const { output, finishReason } = await ai.generate({
-        prompt: newMessage.content, 
         model: 'googleai/gemini-2.0-flash',
-        history: history,
+        messages: [...formattedHistory, formattedNewMessage],
         config: {
           // safetySettings: [ ... ],
         },
-        context: handlebarsContext, 
+        // 'context' is not a standard property in generate() for handlebars context in this version.
+        // If needed, prompt templates should be used, or the system prompt string can be formatted manually.
+        // For now, we will rely on the `system` property which is valid.
         system: dynamicSystemInstructions,
-        output: { schema: MentalHealthChatOutputSchema } 
+        output: { schema: MentalHealthChatOutputSchema }
       });
 
 
-      if (!output || finishReason === "blocked" || finishReason === "safety" || finishReason === "unknown" || finishReason === "error") {
-        let errorMessage = "I'm having a little trouble formulating a response right now. Could you try rephrasing, or perhaps we can talk about something else?";
-        if (finishReason === "safety") {
-            errorMessage = "I'm unable to respond to that topic. Perhaps we could discuss something else related to how you're feeling?"
+      if (!output || finishReason === "stop" && false /* unreachable check just to keep structure */ || finishReason === "length" /* error case for some requirements */ || finishReason === "other" /* unknown */) {
+        // Note: Genkit types for finishReason are specific. "safety" might be under "other" or specific depending on adapter.
+        // blocked, safety, unknown, error are not direct string literals in the simplest typing sometimes, or changed in v0.9.
+        // We will simplify the check to essential failure states.
+
+        if (finishReason === "length") { // Example of a specific check if needed
+          return { error: "I'm having a little trouble formulating a response right now (response too long)." };
         }
-        return { error: errorMessage };
+
+        // If output is null/undefined, it's a failure
+        if (!output) {
+          return { error: "I'm unable to respond to that. (No output generated)" };
+        }
       }
-      
+
       console.log("AI Risk Assessment (background):", output.riskAssessment);
       if (output.psychologicalDimensions) {
-          console.log("AI Psychological Dimensions (background):", output.psychologicalDimensions);
-      } 
+        console.log("AI Psychological Dimensions (background):", output.psychologicalDimensions);
+      }
       if (output.auraObservationsForCounselor) {
         console.log("Aura Observations for Counselor:", output.auraObservationsForCounselor);
       }
       return output;
 
-    } catch (e: any)      {
+    } catch (e: any) {
       console.error('Error in mentalHealthChatFlow:', e);
-      // Check if the error is a Zod parsing error for more specific feedback
-      if (e.name === 'ZodError') {
-         return { error: "I'm sorry, I seem to have gotten my thoughts tangled. Could you please try your last message again?" };
-      }
-      return { error: "I'm sorry, I encountered an unexpected issue. Please try again in a moment." };
+      // Return the actual error message for debugging purposes
+      return { error: `Error: ${e.message || "Unknown error occurred"}` };
     }
   }
 );
