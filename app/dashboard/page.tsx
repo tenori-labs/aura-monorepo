@@ -1,0 +1,261 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import {
+    Avatar,
+    Badge,
+    Box,
+    Button,
+    Card,
+    Flex,
+    Grid,
+    Heading,
+    Separator,
+    Text,
+} from "@radix-ui/themes";
+import { signout } from "@/app/auth/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { HamburgerMenu } from "@/components/hamburger-menu";
+import prisma from "@/lib/db";
+import Link from "next/link";
+
+export default async function DashboardPage() {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const email = user.email ?? "No email";
+    const name =
+        user.user_metadata?.full_name ??
+        user.user_metadata?.name ??
+        email.split("@")[0];
+    const avatarUrl = user.user_metadata?.avatar_url ?? "";
+    const initials = name.charAt(0).toUpperCase();
+
+    // Fetch real incidents from MongoDB for this user
+    const incidents = await prisma.incidentReport.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+    });
+
+    // Helper to get status badge color
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "pending": return "blue" as const;
+            case "reviewing": return "orange" as const;
+            case "resolved": return "green" as const;
+            default: return "gray" as const;
+        }
+    };
+
+    // Helper to format date
+    const formatDate = (date: Date) => {
+        return new Date(date).toLocaleDateString("en-US", {
+            month: "short", day: "numeric", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+        });
+    };
+
+    return (
+        <div
+            className="font-sans"
+            style={{
+                minHeight: "100vh",
+                display: "flex",
+                flexDirection: "column",
+                background: "var(--gray-a2)",
+            }}
+        >
+            {/* ─── Header ─── */}
+            <Flex
+                align="center"
+                justify="between"
+                wrap="wrap"
+                gap="3"
+                px={{ initial: "4", sm: "6" }}
+                py="3"
+                style={{
+                    borderBottom: "1px solid var(--gray-a5)",
+                    background: "var(--color-background)",
+                    flexShrink: 0,
+                }}
+            >
+                <Flex direction="column" gap="1">
+                    <Heading size={{ initial: "4", sm: "5" }}>Student Dashboard</Heading>
+                    <Text size="2" color="gray">
+                        Welcome, {name}!
+                    </Text>
+                </Flex>
+                <Flex align="center" gap="3">
+                    <HamburgerMenu />
+                </Flex>
+            </Flex>
+
+            {/* ─── Main Content (single vertical column) ─── */}
+            <Flex
+                direction="column"
+                gap="5"
+                px={{ initial: "4", sm: "6" }}
+                py="5"
+                style={{ flex: 1, overflow: "auto", maxWidth: "900px", width: "100%", margin: "0 auto" }}
+            >
+                {/* Profile Card */}
+                <Card size="2">
+                    <Flex direction="column" align="center" gap="3" py="3">
+                        <Avatar
+                            size="6"
+                            src={avatarUrl}
+                            fallback={initials}
+                            radius="full"
+                        />
+                        <Flex direction="column" align="center" gap="1">
+                            <Text size="3" weight="bold">
+                                {name}
+                            </Text>
+                            <Text size="1" color="gray">
+                                {email}
+                            </Text>
+                        </Flex>
+                    </Flex>
+
+                    <Separator size="4" my="3" />
+
+                    <Flex direction="column" gap="2">
+                        <Flex justify="between" wrap="wrap" gap="1">
+                            <Text size="2" color="gray">Email</Text>
+                            <Text size="2" weight="medium" style={{ wordBreak: "break-all", textAlign: "right", maxWidth: "65%" }}>
+                                {email}
+                            </Text>
+                        </Flex>
+                        <Flex justify="between">
+                            <Text size="2" color="gray">Reports Filed</Text>
+                            <Text size="2" weight="medium">{incidents.length}</Text>
+                        </Flex>
+                    </Flex>
+
+                    <Box mt="4">
+                        <Button variant="outline" size="2" style={{ width: "100%" }} disabled>
+                            Edit Profile (Coming Soon)
+                        </Button>
+                    </Box>
+                </Card>
+
+                {/* Appointments Card */}
+                <Card size="2">
+                    <Heading size="3" mb="3">My Counseling Appointments</Heading>
+                    <Badge color="orange" size="1" mb="3">Awaiting Confirmation</Badge>
+                    <Text as="p" size="2" color="gray" mt="2">
+                        Your appointment with <Text weight="bold">Dr. Emily Carter</Text> on{" "}
+                        <Text weight="bold">February 12, 2026 at 10:00 AM</Text> is pending
+                        counselor approval.
+                    </Text>
+                    <Text as="p" size="1" color="gray" mt="3">
+                        You will be notified once your counselor confirms the appointment.
+                    </Text>
+                </Card>
+
+                {/* Incidents Section */}
+                <Flex justify="between" align="center" wrap="wrap" gap="3">
+                    <Flex direction="column" gap="1">
+                        <Heading size={{ initial: "3", sm: "4" }}>My Reported Incidents</Heading>
+                        <Text size="2" color="gray">
+                            Track the status of your submitted reports.
+                        </Text>
+                    </Flex>
+                    <Link href="/report-incident">
+                        <Button size="2">Report New Incident</Button>
+                    </Link>
+                </Flex>
+
+                <Flex direction="column" gap="4">
+                    {incidents.length === 0 ? (
+                        <Card size="2">
+                            <Flex direction="column" align="center" gap="2" py="5">
+                                <Text size="3" color="gray" weight="medium">No reports yet</Text>
+                                <Text size="2" color="gray">
+                                    Your submitted incident reports will appear here.
+                                </Text>
+                            </Flex>
+                        </Card>
+                    ) : (
+                        incidents.map((incident) => (
+                            <Card
+                                key={incident.id}
+                                size="2"
+                            >
+                                <Flex justify="between" align="start" gap="2" mb="2">
+                                    <Heading size="3" style={{ flex: 1 }}>
+                                        {incident.aiAnalysis?.category ?? incident.incidentType}: {incident.location}
+                                    </Heading>
+                                    <Badge
+                                        color={getStatusColor(incident.status)}
+                                        size="1"
+                                        style={{ flexShrink: 0, textTransform: "capitalize" }}
+                                    >
+                                        {incident.status}
+                                    </Badge>
+                                </Flex>
+
+                                <Text size="1" color="gray" mb="2" style={{ display: "block" }}>
+                                    Reported: {formatDate(incident.createdAt)}
+                                </Text>
+
+                                <Text as="p" size="2" mb="3" style={{ lineHeight: 1.5 }}>
+                                    {incident.description}
+                                </Text>
+
+                                <Separator size="4" mb="3" />
+
+                                {/* AI Classification */}
+                                {incident.aiAnalysis && (
+                                    <Flex direction="column" gap="2">
+                                        <Text size="1" color="gray">AI Classification:</Text>
+                                        <Flex align="center" gap="2" wrap="wrap">
+                                            <Badge variant="surface" size="1">
+                                                {incident.aiAnalysis.category}
+                                            </Badge>
+                                            <Text size="1" color="gray">
+                                                (Confidence: {Math.round(incident.aiAnalysis.confidence * 100)}%)
+                                            </Text>
+                                            <Badge
+                                                color={
+                                                    incident.aiAnalysis.validity === "Likely Valid" ? "green" :
+                                                        incident.aiAnalysis.validity === "Needs Review" ? "orange" : "red"
+                                                }
+                                                size="1"
+                                                variant="soft"
+                                            >
+                                                {incident.aiAnalysis.validity}
+                                            </Badge>
+                                        </Flex>
+                                        <Flex gap="1" wrap="wrap" mt="1">
+                                            <Text size="1" color="gray">Keywords:</Text>
+                                            {incident.aiAnalysis.keywords.map((kw) => (
+                                                <Badge
+                                                    key={kw}
+                                                    variant="soft"
+                                                    color="gray"
+                                                    size="1"
+                                                >
+                                                    {kw}
+                                                </Badge>
+                                            ))}
+                                        </Flex>
+                                        <Text size="1" color="gray" mt="1">
+                                            Last updated: {formatDate(incident.updatedAt)}
+                                        </Text>
+                                    </Flex>
+                                )}
+                            </Card>
+                        ))
+                    )}
+                </Flex>
+            </Flex>
+        </div>
+    );
+}

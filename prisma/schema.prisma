@@ -1,0 +1,39 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Embedded type for AI Analysis
+type AiAnalysis {
+  category        String
+  confidence      Float
+  keywords        String[]
+  validity        String // "Likely Valid" | "Needs Review" | "Invalid"
+  validityReason  String
+}
+
+model IncidentReport {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String?
+  userEmail     String?
+  incidentType  String
+  dateTime      DateTime
+  location      String
+  description   String
+  email         String?
+  mediaBase64   String?
+  mediaType     String?
+  mediaFileName String?
+  aiAnalysis    AiAnalysis?
+  status        String       @default("pending")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
