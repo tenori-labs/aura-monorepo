@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: [
+    "genkit",
+    "@genkit-ai/core",
+    "express",
+    "import-in-the-middle",
+    "require-in-the-middle",
+  ],
 };
 
 export default nextConfig;

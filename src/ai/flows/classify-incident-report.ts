@@ -18,7 +18,7 @@
  * @exports ClassifyIncidentReportOutput - The output type for the classifyIncidentReport function.
  */
 
-import {ai} from '@/ai/genkit';
+import { ai } from '@/ai/genkit';
 import {z} from 'genkit';
 
 /**

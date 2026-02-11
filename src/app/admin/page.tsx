@@ -236,7 +236,15 @@ export default function AdminPortalPage() {
                             />
                           ))}
                         </Pie>
-                         <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                         <ChartLegend
+                          content={({ payload, verticalAlign }) => (
+                            <ChartLegendContent
+                              payload={payload}
+                              verticalAlign={verticalAlign}
+                              nameKey="name"
+                            />
+                          )}
+                        />
                       </PieChart>
                     </ChartContainer>
               </CardContent>

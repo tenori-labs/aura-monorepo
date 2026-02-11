@@ -162,9 +162,9 @@ export default function MentalHealthChatPage() {
       const response = await mentalHealthChat(chatInput);
 
       if (response.botResponse) {
-        setMessages((prevMessages) => [...prevMessages, response.botResponse]);
-      } else if (response.error) {
-         setMessages((prevMessages) => [...prevMessages, { role: "model", content: response.error }]);
+        setMessages((prevMessages) => [...prevMessages, response.botResponse!]);
+} else if (response.error) {
+          setMessages((prevMessages) => [...prevMessages, { role: "model" as const, content: response.error! }]);
          toast({ title: "Aura's Response", description: response.error, variant: "default"});
       }
        else {

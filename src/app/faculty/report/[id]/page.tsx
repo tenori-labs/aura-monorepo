@@ -365,7 +365,7 @@ export default function FacultyReportDetailPage() {
         <CardContent className="space-y-6">
           <div>
             <Label htmlFor="status-update" className="text-sm font-medium">Update Incident Status</Label>
-            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as Report['status'])}>
+            <Select value={selectedStatus} onValueChange={(value: string) => setSelectedStatus(value as Report['status'])}>
               <SelectTrigger id="status-update" className="mt-1">
                 <SelectValue placeholder="Select new status" />
               </SelectTrigger>

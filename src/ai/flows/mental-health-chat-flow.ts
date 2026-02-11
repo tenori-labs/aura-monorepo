@@ -137,35 +137,38 @@ const mentalHealthChatFlow = ai.defineFlow(
   async (flowInput) => { 
     const { newMessage, history, isGreeting, studentId, activeCounselorInstructions } = flowInput;
 
-    const handlebarsContext = {
-      studentId: studentId,
-      activeCounselorInstructions: activeCounselorInstructions,
-    };
-    
-    let dynamicSystemInstructions = SYSTEM_INSTRUCTIONS;
+    const counselorBlock = activeCounselorInstructions
+      ? `For your interaction with this student (ID: ${studentId ?? "unknown"}), their counselor has provided the following guidance:
+"${activeCounselorInstructions.replace(/"/g, '\\"')}"
+Please try to weave these points into your conversation naturally and empathetically. For example, if asked to provide a reminder, do so gently. If asked to monitor for certain topics, be attentive and listen for related cues. You do not need to explicitly state that these are from the counselor.`
+      : "";
+    let dynamicSystemInstructions = SYSTEM_INSTRUCTIONS.replace(
+      /\{\{#if activeCounselorInstructions\}\}[\s\S]*?\{\{\/if\}\}/,
+      counselorBlock
+    );
     if (isGreeting) {
-        dynamicSystemInstructions += "\nThis is the first message. Provide a proactive greeting as the content of botResponse. Default internal analysis to 'No Risk', 'Not Assessed', and neutral observations.";
+      dynamicSystemInstructions += "\nThis is the first message. Provide a proactive greeting as the content of botResponse. Default internal analysis to 'No Risk', 'Not Assessed', and neutral observations.";
     }
-    
+
+    const messages = (history ?? []).map((m) => ({
+      role: m.role as "user" | "model",
+      content: [{ text: m.content }],
+    }));
+    messages.push({ role: "user", content: [{ text: newMessage.content }] });
+
     try {
       const { output, finishReason } = await ai.generate({
-        prompt: newMessage.content, 
-        model: 'googleai/gemini-2.0-flash',
-        history: history,
-        config: {
-          // safetySettings: [ ... ],
-        },
-        context: handlebarsContext, 
+        messages,
+        model: "googleai/gemini-2.0-flash",
+        config: {},
         system: dynamicSystemInstructions,
-        output: { schema: MentalHealthChatOutputSchema } 
+        output: { schema: MentalHealthChatOutputSchema },
       });
 
 
-      if (!output || finishReason === "blocked" || finishReason === "safety" || finishReason === "unknown" || finishReason === "error") {
-        let errorMessage = "I'm having a little trouble formulating a response right now. Could you try rephrasing, or perhaps we can talk about something else?";
-        if (finishReason === "safety") {
-            errorMessage = "I'm unable to respond to that topic. Perhaps we could discuss something else related to how you're feeling?"
-        }
+      if (!output || (finishReason !== "stop" && finishReason !== "length")) {
+        const errorMessage =
+          "I'm having a little trouble formulating a response right now. Could you try rephrasing, or perhaps we can talk about something else?";
         return { error: errorMessage };
       }
       

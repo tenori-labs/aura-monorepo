@@ -124,7 +124,7 @@ export let globalDummyAppointments: BookedAppointment[] = [
         auraChatSummary: "Patty discussed relationship difficulties with Aura. Expressed sadness and frustration. Aura listened empathetically and suggested resources for conflict resolution and emotional support.",
         meetingLink: `https://meet.example.com/session/appt-patty-confirmed-${Date.now().toString().slice(-5)}`
     }
-].sort((a,b) => parseISO(a.appointmentDate).getTime() - parseISO(b.appointmentDate).getTime() || a.appointmentTime.localeCompare(b.appointmentTime));
+].sort((a,b) => parseISO(a.appointmentDate).getTime() - parseISO(b.appointmentDate).getTime() || a.appointmentTime.localeCompare(b.appointmentTime)) as BookedAppointment[];
 
 
 // Generates all 30-minute slots for a given day (from 9 AM to 9 PM)
@@ -335,10 +335,10 @@ export default function CounselorDashboardPage() {
               <Calendar
                 mode="single"
                 selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(startOfDay(date))}
+                onSelect={(date: Date | undefined) => date && setSelectedDate(startOfDay(date))}
                 initialFocus
                 className="shadow-sm"
-                 disabled={(date) => isBefore(date, startOfDay(new Date())) && !isSameDay(date, startOfDay(new Date()))} 
+                 disabled={(date: Date) => isBefore(date, startOfDay(new Date())) && !isSameDay(date, startOfDay(new Date()))} 
               />
                 <Button variant="outline" className="w-full mt-4" onClick={() => toast({title: "Feature Coming Soon", description: "Full working hours configuration will be available in a future update."})}>
                   <Settings2 className="mr-2 h-4 w-4" /> Edit Full Working Hours (Soon)
@@ -537,7 +537,7 @@ export default function CounselorDashboardPage() {
       )}
 
       {selectedAppointmentForInsights && (
-        <Dialog open={isInsightsModalOpen} onOpenChange={(isOpen) => {
+        <Dialog open={isInsightsModalOpen} onOpenChange={(isOpen: boolean) => {
             setIsInsightsModalOpen(isOpen);
             if (!isOpen) setSelectedAppointmentForInsights(null); 
         }}>

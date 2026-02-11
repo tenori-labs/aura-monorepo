@@ -87,7 +87,7 @@ export default function ScheduleCounselorPage() {
   useEffect(() => {
     if (selectedCounselor && selectedDate) {
       const dateString = format(selectedDate, "yyyy-MM-dd");
-      const slotsForDate = selectedCounselor.availability[dateString] || [];
+      const slotsForDate = selectedCounselor.availability?.[dateString] || [];
       setAvailableSlots(slotsForDate.filter(slot => !slot.isBooked));
       setSelectedSlot(null); // Reset selected slot when date changes
     } else {
@@ -121,7 +121,7 @@ export default function ScheduleCounselorPage() {
       });
       // Mark slot as booked (locally, for this session)
       const dateString = format(selectedDate, "yyyy-MM-dd");
-      if (selectedCounselor.availability[dateString]) {
+      if (selectedCounselor.availability?.[dateString]) {
           const slotIndex = selectedCounselor.availability[dateString].findIndex(s => s.id === selectedSlot.id);
           if (slotIndex > -1) {
               // This is a dummy update for demo purposes
@@ -194,9 +194,9 @@ export default function ScheduleCounselorPage() {
                   mode="single"
                   selected={selectedDate}
                   onSelect={setSelectedDate}
-                  disabled={(date) => {
+                  disabled={(date: Date) => {
                     const dateString = format(date, "yyyy-MM-dd");
-                    const slots = selectedCounselor.availability[dateString] || [];
+                    const slots = selectedCounselor.availability?.[dateString] || [];
                     const availableFutureSlots = slots.filter(s => !s.isBooked).length > 0;
                     return date < today || !availableFutureSlots;
                   }}
@@ -215,7 +215,7 @@ export default function ScheduleCounselorPage() {
               {availableSlots.length > 0 ? (
                 <RadioGroup
                   value={selectedSlot?.id}
-                  onValueChange={(slotId) => {
+                  onValueChange={(slotId: string) => {
                     const slot = availableSlots.find(s => s.id === slotId);
                     setSelectedSlot(slot || null);
                   }}

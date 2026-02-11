@@ -18,11 +18,11 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 
 const consentSchema = z.object({
-  studentAgreement: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the undertaking." }),
+  studentAgreement: z.boolean().refine((v) => v === true, {
+    message: "You must agree to the undertaking.",
   }),
-  parentAgreement: z.literal(true, {
-    errorMap: () => ({ message: "You must confirm your parent/guardian has also read this." }),
+  parentAgreement: z.boolean().refine((v) => v === true, {
+    message: "You must confirm your parent/guardian has also read this.",
   }),
   signature: z.string().min(1, "Signature is required."), // This will be the typed name
 });

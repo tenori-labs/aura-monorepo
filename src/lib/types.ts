@@ -94,7 +94,7 @@ export interface BookedAppointment {
 export interface TimeSlot { // Used for generic time slot display in scheduling, not for counselor's core availability record
   id: string;
   time: string;
-  // isBooked is determined dynamically by checking BookedAppointments and Counselor.unavailableSlots
+  isBooked?: boolean; // Present when from Counselor.availability
 }
 
 export interface SelfHelpContent {
