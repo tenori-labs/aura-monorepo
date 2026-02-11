@@ -1,24 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Box, Flex, Text, Separator, Button } from "@radix-ui/themes";
+import { Box, Flex, Text, Button } from "@radix-ui/themes";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signout } from "@/app/auth/actions";
+import { createClient } from "@/lib/supabase/client";
+import type { UserRole } from "@/lib/roles";
 
-const navItems = [
-    { label: "Incident Reporting", href: "/report-incident" },
-    { label: "Well-Being", href: "/well-being" },
-    { label: "Student Dashboard", href: "/dashboard" },
-    { label: "Admin Dashboard", href: "/admin-dashboard" },
-    { label: "Faculty Dashboard", href: "/faculty-dashboard" },
-    { label: "Consent Form", href: "/consent-form" },
+const allNavItems = [
+    { label: "Incident Reporting", href: "/report-incident", roles: ["student", "faculty"] as UserRole[] },
+    { label: "Well-Being", href: "/well-being", roles: ["student", "faculty"] as UserRole[] },
+    { label: "Dashboard", href: "/dashboard", roles: ["student"] as UserRole[] },
+    { label: "Faculty Dashboard", href: "/faculty-dashboard", roles: ["faculty"] as UserRole[] },
+    { label: "Admin Dashboard", href: "/admin-dashboard", roles: ["faculty"] as UserRole[] },
+    { label: "Consent Form", href: "/consent-form", roles: ["student", "faculty"] as UserRole[] },
 ];
 
-export function HamburgerMenu() {
+interface HamburgerMenuProps {
+    userRole?: UserRole;
+}
+
+export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
     const [open, setOpen] = useState(false);
+    const [role, setRole] = useState<UserRole>(propRole || "student");
     const pathname = usePathname();
+
+    // Fetch role from Supabase if not passed as prop
+    useEffect(() => {
+        if (propRole) {
+            setRole(propRole);
+            return;
+        }
+
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user?.app_metadata?.role) {
+                setRole(user.app_metadata.role as UserRole);
+            }
+        });
+    }, [propRole]);
+
+    // Filter nav items based on role
+    const navItems = allNavItems.filter((item) => item.roles.includes(role));
 
     return (
         <Box>

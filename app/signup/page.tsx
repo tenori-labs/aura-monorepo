@@ -6,12 +6,13 @@ import { signup } from "@/app/auth/actions";
 import { useSearchParams } from "next/navigation";
 import { CheckIcon } from "@radix-ui/react-icons";
 import { Marker } from "@/components/Marker";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 function SignupForm() {
     const searchParams = useSearchParams();
     const error = searchParams.get("error");
     const message = searchParams.get("message");
+    const [selectedRole, setSelectedRole] = useState<"student" | "faculty">("student");
 
     return (
         <div
@@ -40,16 +41,16 @@ function SignupForm() {
                         </Flex>
                     ) : (
                         <>
-                            <Heading as="h3" size="6" trim="start" mb="5">
+                            <Heading as="h3" size="6" trim="start" mb="2">
                                 Create an account
                             </Heading>
 
-                            <Text as="p" size="2" mb="6" color="gray">
+                            <Text as="p" size="2" mb="5" color="gray">
                                 Get started with your new account.
                             </Text>
 
                             {error && (
-                                <Box mb="5" p="3" style={{ backgroundColor: "var(--red-a3)", borderRadius: "var(--radius-2)" }}>
+                                <Box mb="4" p="3" style={{ backgroundColor: "var(--red-a3)", borderRadius: "var(--radius-2)" }}>
                                     <Text size="2" color="red">
                                         {error}
                                     </Text>
@@ -58,7 +59,79 @@ function SignupForm() {
 
                             <Flex direction="column" asChild>
                                 <form>
-                                    <Box mb="5">
+                                    {/* Role Selector */}
+                                    <Flex
+                                        gap="0"
+                                        mb="5"
+                                        style={{
+                                            borderRadius: "var(--radius-2)",
+                                            border: "1px solid var(--gray-a6)",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedRole("student")}
+                                            style={{
+                                                flex: 1,
+                                                padding: "10px 16px",
+                                                border: "none",
+                                                borderRight: "1px solid var(--gray-a6)",
+                                                background: selectedRole === "student"
+                                                    ? "var(--accent-a3)"
+                                                    : "transparent",
+                                                color: selectedRole === "student"
+                                                    ? "var(--accent-11)"
+                                                    : "var(--gray-11)",
+                                                cursor: "pointer",
+                                                fontWeight: selectedRole === "student" ? 600 : 400,
+                                                fontSize: "14px",
+                                                transition: "all 0.15s ease",
+                                            }}
+                                        >
+                                            Student
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedRole("faculty")}
+                                            style={{
+                                                flex: 1,
+                                                padding: "10px 16px",
+                                                border: "none",
+                                                background: selectedRole === "faculty"
+                                                    ? "var(--accent-a3)"
+                                                    : "transparent",
+                                                color: selectedRole === "faculty"
+                                                    ? "var(--accent-11)"
+                                                    : "var(--gray-11)",
+                                                cursor: "pointer",
+                                                fontWeight: selectedRole === "faculty" ? 600 : 400,
+                                                fontSize: "14px",
+                                                transition: "all 0.15s ease",
+                                            }}
+                                        >
+                                            Faculty
+                                        </button>
+                                    </Flex>
+                                    <input type="hidden" name="role" value={selectedRole} />
+
+                                    {/* Full Name */}
+                                    <Box mb="4">
+                                        <Text as="label" htmlFor="signup-fullname" size="2" weight="bold" mb="1" style={{ display: "block" }}>
+                                            Full Name
+                                        </Text>
+                                        <TextField.Root
+                                            radius="small"
+                                            id="signup-fullname"
+                                            name="fullName"
+                                            type="text"
+                                            placeholder="Enter your full name"
+                                            required
+                                        />
+                                    </Box>
+
+                                    {/* Email */}
+                                    <Box mb="4">
                                         <Text as="label" htmlFor="signup-email" size="2" weight="bold" mb="1" style={{ display: "block" }}>
                                             Email address
                                         </Text>
@@ -72,7 +145,8 @@ function SignupForm() {
                                         />
                                     </Box>
 
-                                    <Box mb="5">
+                                    {/* Password */}
+                                    <Box mb="4">
                                         <Text as="label" size="2" weight="bold" htmlFor="signup-password" mb="1" style={{ display: "block" }}>
                                             Password
                                         </Text>
@@ -86,7 +160,7 @@ function SignupForm() {
                                         />
                                     </Box>
 
-                                    <Flex mt="6" justify="end" gap="3" align="center">
+                                    <Flex mt="5" justify="end" gap="3" align="center">
                                         <Link href="/login" size="2">
                                             Already have an account?
                                         </Link>
@@ -111,4 +185,3 @@ export default function SignupPage() {
         </Suspense>
     );
 }
-

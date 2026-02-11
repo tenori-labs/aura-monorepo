@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { FACULTY_ONLY_ROUTES, ALL_PROTECTED_ROUTES } from "@/lib/roles";
 
 export async function updateSession(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
@@ -37,41 +38,43 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser();
 
-    // Define protected and auth-only routes
-    const protectedRoutes = [
-        "/dashboard",
-        "/admin-dashboard",
-        "/faculty-dashboard",
-        "/report-incident",
-        "/well-being",
-        "/consent-form",
-        "/charts",
-    ];
     const authRoutes = ["/login", "/signup"];
-
     const pathname = request.nextUrl.pathname;
 
-    // Redirect unauthenticated users away from protected routes
+    // 1. Redirect unauthenticated users away from ALL protected routes
     if (
         !user &&
-        protectedRoutes.some((route) => pathname.startsWith(route))
+        ALL_PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
     ) {
         const url = request.nextUrl.clone();
         url.pathname = "/login";
         return NextResponse.redirect(url);
     }
 
-    // Redirect authenticated users away from auth pages
+    // 2. Block students from faculty-only routes
+    if (user) {
+        const role = user.app_metadata?.role || "student";
+        if (
+            role !== "faculty" &&
+            FACULTY_ONLY_ROUTES.some((route) => pathname.startsWith(route))
+        ) {
+            const url = request.nextUrl.clone();
+            url.pathname = "/dashboard";
+            return NextResponse.redirect(url);
+        }
+    }
+
+    // 3. Redirect authenticated users away from auth pages
     if (
         user &&
         authRoutes.some((route) => pathname.startsWith(route))
     ) {
         const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
+        const role = user.app_metadata?.role || "student";
+        url.pathname = role === "faculty" ? "/faculty-dashboard" : "/dashboard";
         return NextResponse.redirect(url);
     }
 
     // IMPORTANT: You *must* return the supabaseResponse object as is.
-    // If you need to modify the NextResponse, do so on supabaseResponse directly.
     return supabaseResponse;
 }

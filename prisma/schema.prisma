@@ -37,3 +37,17 @@ model IncidentReport {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
+
+model ConsentRecord {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String
+  userEmail      String
+  fullName       String
+  studentId      String?
+  course         String?
+  section        String?
+  consentVersion String   @default("UGC-2009-v1")
+  ipAddress      String?
+  userAgent      String?
+  signedAt       DateTime @default(now())
+}
