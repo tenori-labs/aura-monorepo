@@ -38,7 +38,6 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser();
 
-    const authRoutes = ["/login", "/signup"];
     const pathname = request.nextUrl.pathname;
 
     // 1. Redirect unauthenticated users away from ALL protected routes
@@ -47,7 +46,7 @@ export async function updateSession(request: NextRequest) {
         ALL_PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
     ) {
         const url = request.nextUrl.clone();
-        url.pathname = "/login";
+        url.pathname = "/"; // Redirect to Home (Login)
         return NextResponse.redirect(url);
     }
 
@@ -64,11 +63,8 @@ export async function updateSession(request: NextRequest) {
         }
     }
 
-    // 3. Redirect authenticated users away from auth pages
-    if (
-        user &&
-        authRoutes.some((route) => pathname.startsWith(route))
-    ) {
+    // 3. Redirect authenticated users away from auth pages (Home/Login & Signup)
+    if (user && (pathname === "/" || pathname === "/signup")) {
         const url = request.nextUrl.clone();
         const role = user.app_metadata?.role || "student";
         url.pathname = role === "faculty" ? "/faculty-dashboard" : "/dashboard";
