@@ -17,6 +17,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { HamburgerMenu } from "@/components/hamburger-menu";
 import prisma from "@/lib/db";
 import Link from "next/link";
+import { getUserRole } from "@/lib/roles";
+import { CheckCircledIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 
 export default async function DashboardPage() {
     const supabase = await createClient();
@@ -36,12 +38,19 @@ export default async function DashboardPage() {
         email.split("@")[0];
     const avatarUrl = user.user_metadata?.avatar_url ?? "";
     const initials = name.charAt(0).toUpperCase();
+    const userRole = getUserRole(user);
 
     // Fetch real incidents from MongoDB for this user
     const incidents = await prisma.incidentReport.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
     });
+
+    // Check for consent
+    const consentRecord = await prisma.consentRecord.findFirst({
+        where: { userId: user.id },
+    });
+    const hasConsented = !!consentRecord;
 
     // Helper to get status badge color
     const getStatusColor = (status: string) => {
@@ -86,13 +95,13 @@ export default async function DashboardPage() {
                 }}
             >
                 <Flex direction="column" gap="1">
-                    <Heading size={{ initial: "4", sm: "5" }}>Student Dashboard</Heading>
+                    <Heading size={{ initial: "4", sm: "5" }}>{userRole === "faculty" ? "Faculty" : "Student"} Dashboard</Heading>
                     <Text size="2" color="gray">
                         Welcome, {name}!
                     </Text>
                 </Flex>
                 <Flex align="center" gap="3">
-                    <HamburgerMenu />
+                    <HamburgerMenu userRole={userRole} />
                 </Flex>
             </Flex>
 
@@ -146,17 +155,42 @@ export default async function DashboardPage() {
                 </Card>
 
                 {/* Appointments Card */}
+                {/* Consent Status Card */}
                 <Card size="2">
-                    <Heading size="3" mb="3">My Counseling Appointments</Heading>
-                    <Badge color="orange" size="1" mb="3">Awaiting Confirmation</Badge>
-                    <Text as="p" size="2" color="gray" mt="2">
-                        Your appointment with <Text weight="bold">Dr. Emily Carter</Text> on{" "}
-                        <Text weight="bold">February 12, 2026 at 10:00 AM</Text> is pending
-                        counselor approval.
-                    </Text>
-                    <Text as="p" size="1" color="gray" mt="3">
-                        You will be notified once your counselor confirms the appointment.
-                    </Text>
+                    <Flex direction="column" gap="2">
+                        <Heading size="3">Anti-Ragging Undertaking</Heading>
+                        <Flex align="center" gap="2" mt="1">
+                            {hasConsented ? (
+                                <>
+                                    <CheckCircledIcon color="green" width="20" height="20" />
+                                    <Text size="2" color="green" weight="bold">
+                                        Consent Form Completed
+                                    </Text>
+                                </>
+                            ) : (
+                                <>
+                                    <ExclamationTriangleIcon color="orange" width="20" height="20" />
+                                    <Text size="2" color="orange" weight="bold">
+                                        Consent Form Pending
+                                    </Text>
+                                </>
+                            )}
+                        </Flex>
+                        {!hasConsented && (
+                            <Link href="/consent-form" style={{ textDecoration: 'none' }}>
+                                <Button size="2" variant="soft" color="orange" style={{ width: '100%' }}>
+                                    Sign Now
+                                </Button>
+                            </Link>
+                        )}
+                        {hasConsented && (
+                            <Link href="/consent-form" style={{ textDecoration: 'none' }}>
+                                <Button size="2" variant="soft" color="green" style={{ width: '100%' }}>
+                                    View Receipt
+                                </Button>
+                            </Link>
+                        )}
+                    </Flex>
                 </Card>
 
                 {/* Incidents Section */}
@@ -259,3 +293,4 @@ export default async function DashboardPage() {
         </div>
     );
 }
+
