@@ -13,7 +13,7 @@ export default async function AdminDashboardPage() {
 
     // Second layer of defense (middleware is first)
     if (!user) {
-        redirect("/login");
+        redirect("/");
     }
 
     const role = getUserRole(user);

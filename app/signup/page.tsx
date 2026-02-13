@@ -35,7 +35,7 @@ function SignupForm() {
                             <Text as="p" size="3" align="center" color="gray">
                                 {message}
                             </Text>
-                            <Link href="/login" size="2" mt="4">
+                            <Link href="/" size="2" mt="4">
                                 Back to sign in
                             </Link>
                         </Flex>
@@ -161,7 +161,7 @@ function SignupForm() {
                                     </Box>
 
                                     <Flex mt="5" justify="end" gap="3" align="center">
-                                        <Link href="/login" size="2">
+                                        <Link href="/" size="2">
                                             Already have an account?
                                         </Link>
                                         <Button type="submit" formAction={signup}>

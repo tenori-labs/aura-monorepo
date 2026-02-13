@@ -13,7 +13,7 @@ export default async function ConsentFormPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-        redirect("/login");
+        redirect("/");
     }
 
     const role = getUserRole(user);
