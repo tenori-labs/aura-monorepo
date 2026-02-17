@@ -51,12 +51,12 @@ export default async function FacultyDashboardPage() {
     });
     const categoryNames = myCategories.map((c: { category: string }) => c.category);
 
-    const incidents = await prisma.incidentReport.findMany({
-        where: categoryNames.length > 0
-            ? { incidentType: { in: categoryNames } }
-            : { id: "__none__" },
-        orderBy: { createdAt: "desc" },
-    });
+    const incidents = categoryNames.length > 0
+        ? await prisma.incidentReport.findMany({
+            where: { incidentType: { in: categoryNames } },
+            orderBy: { createdAt: "desc" },
+        })
+        : [];
 
     // Fetch category assignments for the timeline to display
     const allAssignments = await prisma.categoryAssignment.findMany();
