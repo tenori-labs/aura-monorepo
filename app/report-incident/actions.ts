@@ -60,7 +60,22 @@ export async function submitIncident(prevState: any, formData: FormData) {
         console.error("AI Classification Failed:", error);
     }
 
-    // 6. Save to MongoDB via Prisma
+    // 6. Lookup category assignment for auto-assign
+    let assignedTo: string | null = null;
+    let assignedToEmail: string | null = null;
+    try {
+        const assignment = await prisma.categoryAssignment.findUnique({
+            where: { category: type },
+        });
+        if (assignment) {
+            assignedTo = assignment.facultyId;
+            assignedToEmail = assignment.facultyEmail;
+        }
+    } catch (lookupError) {
+        console.error("Category assignment lookup failed:", lookupError);
+    }
+
+    // 7. Save to MongoDB via Prisma
     try {
         // Debug: Check the DATABASE_URL has a db name
         const dbUrl = process.env.DATABASE_URL || "NOT SET";
@@ -87,7 +102,9 @@ export async function submitIncident(prevState: any, formData: FormData) {
                         validityReason: aiResult.validityReason,
                     }
                     : undefined,
-                status: "pending",
+                status: assignedTo ? "assigned" : "pending",
+                assignedTo,
+                assignedToEmail,
             },
         });
 

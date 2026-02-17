@@ -1,6 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { FACULTY_ONLY_ROUTES, ALL_PROTECTED_ROUTES } from "@/lib/roles";
+import {
+    ADMIN_ONLY_ROUTES,
+    FACULTY_ROUTES,
+    ALL_PROTECTED_ROUTES,
+    getDashboardPath,
+    canAccessFacultyRoutes,
+    isAdmin,
+} from "@/lib/roles";
 
 export async function updateSession(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
@@ -16,7 +23,7 @@ export async function updateSession(request: NextRequest) {
                     return request.cookies.getAll();
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) =>
+                    cookiesToSet.forEach(({ name, value }) =>
                         request.cookies.set(name, value)
                     );
                     supabaseResponse = NextResponse.next({
@@ -46,29 +53,39 @@ export async function updateSession(request: NextRequest) {
         ALL_PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
     ) {
         const url = request.nextUrl.clone();
-        url.pathname = "/"; // Redirect to Home (Login)
+        url.pathname = "/";
         return NextResponse.redirect(url);
     }
 
-    // 2. Block students from faculty-only routes
     if (user) {
-        const role = user.app_metadata?.role || "student";
+        // 2. Block non-admins from admin-only routes
         if (
-            role !== "faculty" &&
-            FACULTY_ONLY_ROUTES.some((route) => pathname.startsWith(route))
+            !isAdmin(user) &&
+            ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))
+        ) {
+            const url = request.nextUrl.clone();
+            // Redirect faculty to their dashboard, students to theirs
+            url.pathname = getDashboardPath(user);
+            return NextResponse.redirect(url);
+        }
+
+        // 3. Block students from faculty routes
+        //    (admins pass through since canAccessFacultyRoutes includes them)
+        if (
+            !canAccessFacultyRoutes(user) &&
+            FACULTY_ROUTES.some((route) => pathname.startsWith(route))
         ) {
             const url = request.nextUrl.clone();
             url.pathname = "/dashboard";
             return NextResponse.redirect(url);
         }
-    }
 
-    // 3. Redirect authenticated users away from auth pages (Home/Login & Signup)
-    if (user && (pathname === "/" || pathname === "/signup")) {
-        const url = request.nextUrl.clone();
-        const role = user.app_metadata?.role || "student";
-        url.pathname = role === "faculty" ? "/faculty-dashboard" : "/dashboard";
-        return NextResponse.redirect(url);
+        // 4. Redirect authenticated users away from auth pages (Home/Login & Signup)
+        if (pathname === "/" || pathname === "/signup") {
+            const url = request.nextUrl.clone();
+            url.pathname = getDashboardPath(user);
+            return NextResponse.redirect(url);
+        }
     }
 
     // IMPORTANT: You *must* return the supabaseResponse object as is.

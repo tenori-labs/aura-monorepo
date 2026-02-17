@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Container, Heading, Text, Flex } from "@radix-ui/themes";
+import { Heading, Text, Flex, Separator } from "@radix-ui/themes";
 import { HamburgerMenu } from "@/components/hamburger-menu";
+import { CategoryManager } from "@/components/category-manager";
 import { getUserRole } from "@/lib/roles";
 
 export default async function AdminDashboardPage() {
@@ -17,7 +18,7 @@ export default async function AdminDashboardPage() {
     }
 
     const role = getUserRole(user);
-    if (role !== "faculty") {
+    if (role !== "admin") {
         redirect("/dashboard");
     }
 
@@ -57,12 +58,40 @@ export default async function AdminDashboardPage() {
             </Flex>
 
             {/* Main Content */}
-            <Container p="6" style={{ flex: 1 }}>
-                <Heading size="4" mb="4">Administrative Controls</Heading>
-                <Text as="p" size="3" color="gray">
-                    Administrative controls, system overview, and management tools will go here.
-                </Text>
-            </Container>
+            <Flex
+                direction="column"
+                gap="5"
+                px={{ initial: "4", sm: "6" }}
+                py="5"
+                style={{
+                    flex: 1,
+                    overflow: "auto",
+                    maxWidth: "1000px",
+                    width: "100%",
+                    margin: "0 auto",
+                }}
+            >
+                {/* Category Assignment Section */}
+                <Flex direction="column" gap="3">
+                    <Flex direction="column" gap="1">
+                        <Heading size={{ initial: "3", sm: "4" }}>Category Assignments</Heading>
+                        <Text size="2" color="gray">
+                            Assign faculty members to incident categories. Reports will be auto-assigned to the designated faculty.
+                        </Text>
+                    </Flex>
+                    <CategoryManager />
+                </Flex>
+            </Flex>
+
+            {/* Responsive Styles */}
+            <style>{`
+                @media (max-width: 640px) {
+                    .hide-on-mobile { display: none !important; }
+                }
+                @media (min-width: 641px) {
+                    .hide-on-desktop { display: none !important; }
+                }
+            `}</style>
         </div>
     );
 }

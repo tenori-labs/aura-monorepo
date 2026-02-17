@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- 1. Create role enum
-CREATE TYPE public.user_role AS ENUM ('student', 'faculty');
+CREATE TYPE public.user_role AS ENUM ('student', 'faculty', 'admin');
 
 -- 2. Create profiles table
 CREATE TABLE public.profiles (
@@ -46,13 +46,24 @@ CREATE POLICY "Service role can insert profiles"
   ON public.profiles FOR INSERT
   WITH CHECK (true);
 
--- Faculty can view all profiles (for admin/management purposes)
+-- Faculty can view all profiles (for management purposes)
+-- Admin inherits this since admin > faculty in the hierarchy
 CREATE POLICY "Faculty can view all profiles"
   ON public.profiles FOR ALL
   USING (
     EXISTS (
       SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role = 'faculty'
+      WHERE p.id = auth.uid() AND p.role IN ('faculty', 'admin')
+    )
+  );
+
+-- Admins have full unrestricted access to all profiles
+CREATE POLICY "Admins have full access"
+  ON public.profiles FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.role = 'admin'
     )
   );
 
@@ -91,13 +102,27 @@ CREATE TRIGGER check_role_change
   EXECUTE FUNCTION public.prevent_role_change();
 
 -- 8. Auto-create profile on signup (with error handling)
+--    Accepts 'student', 'faculty', or 'admin' via raw_user_meta_data.
+--    Falls back to 'student' for any unrecognised or missing value.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  requested_role TEXT;
+  assigned_role  public.user_role;
 BEGIN
+  requested_role := NEW.raw_user_meta_data->>'role';
+
+  -- Only allow known enum values; everything else becomes 'student'
+  IF requested_role IN ('student', 'faculty', 'admin') THEN
+    assigned_role := requested_role::public.user_role;
+  ELSE
+    assigned_role := 'student';
+  END IF;
+
   INSERT INTO public.profiles (id, role, full_name)
   VALUES (
     NEW.id,
-    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'student'),
+    assigned_role,
     COALESCE(NEW.raw_user_meta_data->>'full_name', '')
   );
   RETURN NEW;
