@@ -4,11 +4,12 @@ import { Box, Button, Card, Flex, Heading, Link, Text, TextField } from "@radix-
 import { ThemeToggle } from "@/components/theme-toggle";
 import { login } from "@/app/auth/actions";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+  const [selectedRole, setSelectedRole] = useState<"student" | "faculty" | "admin">("student");
 
   return (
     <div
@@ -38,6 +39,83 @@ function LoginForm() {
 
           <Flex direction="column" asChild>
             <form>
+              {/* Role Selector */}
+              <Flex
+                gap="0"
+                mb="5"
+                style={{
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--gray-a6)",
+                  overflow: "hidden",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole("student")}
+                  style={{
+                    flex: 1,
+                    padding: "10px 16px",
+                    border: "none",
+                    borderRight: "1px solid var(--gray-a6)",
+                    background: selectedRole === "student"
+                      ? "var(--accent-a3)"
+                      : "transparent",
+                    color: selectedRole === "student"
+                      ? "var(--accent-11)"
+                      : "var(--gray-11)",
+                    cursor: "pointer",
+                    fontWeight: selectedRole === "student" ? 600 : 400,
+                    fontSize: "14px",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole("faculty")}
+                  style={{
+                    flex: 1,
+                    padding: "10px 16px",
+                    border: "none",
+                    borderRight: "1px solid var(--gray-a6)",
+                    background: selectedRole === "faculty"
+                      ? "var(--accent-a3)"
+                      : "transparent",
+                    color: selectedRole === "faculty"
+                      ? "var(--accent-11)"
+                      : "var(--gray-11)",
+                    cursor: "pointer",
+                    fontWeight: selectedRole === "faculty" ? 600 : 400,
+                    fontSize: "14px",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Faculty
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole("admin")}
+                  style={{
+                    flex: 1,
+                    padding: "10px 16px",
+                    border: "none",
+                    background: selectedRole === "admin"
+                      ? "var(--accent-a3)"
+                      : "transparent",
+                    color: selectedRole === "admin"
+                      ? "var(--accent-11)"
+                      : "var(--gray-11)",
+                    cursor: "pointer",
+                    fontWeight: selectedRole === "admin" ? 600 : 400,
+                    fontSize: "14px",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Admin
+                </button>
+              </Flex>
+              <input type="hidden" name="role" value={selectedRole} />
               <Box mb="5">
                 <Text as="label" htmlFor="login-email" size="2" weight="bold" mb="1" style={{ display: "block" }}>
                   Email address

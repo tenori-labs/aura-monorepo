@@ -12,7 +12,7 @@ function SignupForm() {
     const searchParams = useSearchParams();
     const error = searchParams.get("error");
     const message = searchParams.get("message");
-    const [selectedRole, setSelectedRole] = useState<"student" | "faculty">("student");
+    const [selectedRole, setSelectedRole] = useState<"student" | "faculty" | "admin">("student");
 
     return (
         <div
@@ -59,7 +59,6 @@ function SignupForm() {
 
                             <Flex direction="column" asChild>
                                 <form>
-                                    {/* Role Selector */}
                                     <Flex
                                         gap="0"
                                         mb="5"
@@ -98,6 +97,7 @@ function SignupForm() {
                                                 flex: 1,
                                                 padding: "10px 16px",
                                                 border: "none",
+                                                borderRight: "1px solid var(--gray-a6)",
                                                 background: selectedRole === "faculty"
                                                     ? "var(--accent-a3)"
                                                     : "transparent",
@@ -111,6 +111,27 @@ function SignupForm() {
                                             }}
                                         >
                                             Faculty
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedRole("admin")}
+                                            style={{
+                                                flex: 1,
+                                                padding: "10px 16px",
+                                                border: "none",
+                                                background: selectedRole === "admin"
+                                                    ? "var(--accent-a3)"
+                                                    : "transparent",
+                                                color: selectedRole === "admin"
+                                                    ? "var(--accent-11)"
+                                                    : "var(--gray-11)",
+                                                cursor: "pointer",
+                                                fontWeight: selectedRole === "admin" ? 600 : 400,
+                                                fontSize: "14px",
+                                                transition: "all 0.15s ease",
+                                            }}
+                                        >
+                                            Admin
                                         </button>
                                     </Flex>
                                     <input type="hidden" name="role" value={selectedRole} />

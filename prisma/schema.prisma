@@ -20,21 +20,23 @@ type AiAnalysis {
 }
 
 model IncidentReport {
-  id            String       @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String?
-  userEmail     String?
-  incidentType  String
-  dateTime      DateTime
-  location      String
-  description   String
-  email         String?
-  mediaBase64   String?
-  mediaType     String?
-  mediaFileName String?
-  aiAnalysis    AiAnalysis?
-  status        String       @default("pending")
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String?
+  userEmail       String?
+  incidentType    String
+  dateTime        DateTime
+  location        String
+  description     String
+  email           String?
+  mediaBase64     String?
+  mediaType       String?
+  mediaFileName   String?
+  aiAnalysis      AiAnalysis?
+  status          String       @default("pending")
+  assignedTo      String?      // faculty user ID (from Supabase)
+  assignedToEmail String?      // faculty email for display
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 model ConsentRecord {
@@ -50,3 +52,14 @@ model ConsentRecord {
   userAgent      String?
   signedAt       DateTime @default(now())
 }
+
+model CategoryAssignment {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  category     String   @unique  // e.g. "Harassment/Bullying"
+  facultyId    String             // Supabase user ID
+  facultyEmail String             // for display
+  assignedBy   String?            // admin who made the assignment
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+

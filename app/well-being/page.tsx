@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Flex, Heading, Text } from "@radix-ui/themes";
-import { HamburgerMenu } from "@/components/hamburger-menu";
+import { Flex } from "@radix-ui/themes";
+import { PageHeader } from "@/components/page-header";
+import { PageFooter } from "@/components/page-footer";
 import { AuraChat } from "@/components/aura-chat";
 
 export default async function WellBeingPage() {
@@ -31,30 +32,10 @@ export default async function WellBeingPage() {
                 background: "var(--gray-a2)",
             }}
         >
-            {/* Header */}
-            <Flex
-                align="center"
-                justify="between"
-                wrap="wrap"
-                gap="3"
-                px={{ initial: "4", sm: "6" }}
-                py="3"
-                style={{
-                    borderBottom: "1px solid var(--gray-a5)",
-                    background: "var(--color-background)",
-                    flexShrink: 0,
-                }}
-            >
-                <Flex direction="column" gap="1">
-                    <Heading size={{ initial: "4", sm: "5" }}>Well-Being</Heading>
-                    <Text size="2" color="gray">
-                        Talk to Aura, your AI mental health companion
-                    </Text>
-                </Flex>
-                <Flex align="center" gap="3">
-                    <HamburgerMenu />
-                </Flex>
-            </Flex>
+            <PageHeader
+                title="Well-Being"
+                subtitle="Talk to Aura, your AI mental health companion"
+            />
 
             {/* Chat Area */}
             <Flex
@@ -78,6 +59,7 @@ export default async function WellBeingPage() {
                     to { transform: rotate(360deg); }
                 }
             `}</style>
+            <PageFooter />
         </div>
     );
 }

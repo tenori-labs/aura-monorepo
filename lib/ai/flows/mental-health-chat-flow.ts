@@ -78,6 +78,12 @@ const mentalHealthChatFlow = ai.defineFlow(
     async (flowInput: MentalHealthChatInput) => {
         const { newMessage, history, isGreeting } = flowInput;
 
+        // --- PII Filter: sanitize user message before LLM ---
+        const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
+        const [sanitizedMessage, sessionId] = filterPII(newMessage.content || 'Hello');
+
+        console.log('[PII Filter] Chat message sanitized:', sanitizedMessage);
+
         let systemPrompt = SYSTEM_INSTRUCTIONS;
         if (isGreeting) {
             systemPrompt += "\nThis is the first message. Provide a warm greeting as responseText. Default riskAssessment to 'No Risk', anxietyLevel to 'Not Assessed', moodState to 'Neutral', cognitivePatterns to empty array, counselorNotes to 'Initial greeting.'";
@@ -89,10 +95,20 @@ const mentalHealthChatFlow = ai.defineFlow(
                 (m: ChatMessage) => m && m.role && typeof m.content === 'string' && m.content.length > 0
             );
 
-            let formattedHistory = validHistory.map((m: ChatMessage) => ({
-                role: m.role as 'user' | 'model',
-                content: [{ text: m.content }],
-            }));
+            // Sanitize history messages too
+            let formattedHistory = validHistory.map((m: ChatMessage) => {
+                if (m.role === 'user') {
+                    const [sanitizedHist] = filterPII(m.content);
+                    return {
+                        role: m.role as 'user' | 'model',
+                        content: [{ text: sanitizedHist }],
+                    };
+                }
+                return {
+                    role: m.role as 'user' | 'model',
+                    content: [{ text: m.content }],
+                };
+            });
 
             // Gemini requires first message from 'user'
             if (formattedHistory.length > 0 && formattedHistory[0].role === 'model') {
@@ -104,7 +120,7 @@ const mentalHealthChatFlow = ai.defineFlow(
 
             const formattedNewMessage = {
                 role: newMessage.role as 'user' | 'model',
-                content: [{ text: newMessage.content || 'Hello' }],
+                content: [{ text: sanitizedMessage }], // Use sanitized message
             };
 
             const { output } = await ai.generate({
@@ -115,6 +131,7 @@ const mentalHealthChatFlow = ai.defineFlow(
             });
 
             if (!output || !output.responseText) {
+                clearPIISession(sessionId);
                 return { error: "I'm having trouble right now. Please try again." };
             }
 
@@ -122,8 +139,12 @@ const mentalHealthChatFlow = ai.defineFlow(
             console.log("Aura Mood (background):", output.moodState);
             console.log("Aura Anxiety (background):", output.anxietyLevel);
 
+            // --- PII Filter: reconstruct PII in Aura's response ---
+            const restoredResponse = reconstructPII(sessionId, output.responseText);
+            clearPIISession(sessionId);
+
             return {
-                responseText: output.responseText,
+                responseText: restoredResponse,
                 riskAssessment: output.riskAssessment,
                 anxietyLevel: output.anxietyLevel,
                 moodState: output.moodState,
@@ -131,6 +152,7 @@ const mentalHealthChatFlow = ai.defineFlow(
                 counselorNotes: output.counselorNotes,
             };
         } catch (e: any) {
+            clearPIISession(sessionId);
             console.error('Error in mentalHealthChatFlow:', e);
             return { error: `Something went wrong. Please try again.` };
         }

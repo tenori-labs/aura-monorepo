@@ -94,7 +94,24 @@ export const classifyIncidentReport = ai.defineFlow(
         outputSchema: ClassifyIncidentReportOutputSchema,
     },
     async (input) => {
-        const { output } = await classifyIncidentReportPrompt(input);
-        return output!;
+        // --- PII Filter: sanitize before sending to LLM ---
+        const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
+        const [sanitizedText, sessionId] = filterPII(input.reportText);
+
+        console.log('[PII Filter] Original length:', input.reportText.length, '→ Sanitized:', sanitizedText.length);
+
+        const { output } = await classifyIncidentReportPrompt({
+            ...input,
+            reportText: sanitizedText, // Send sanitized text to Gemini
+        });
+
+        // --- PII Filter: reconstruct PII in keywords ---
+        const result = {
+            ...output!,
+            keywords: output!.keywords.map((kw: string) => reconstructPII(sessionId, kw)),
+        };
+
+        clearPIISession(sessionId);
+        return result;
     }
 );

@@ -22,9 +22,12 @@ export async function login(formData: FormData) {
     revalidatePath("/", "layout");
 
     // Redirect based on role
+    // Redirect based on role
     const role = authData.user?.app_metadata?.role || "student";
     if (role === "faculty") {
         redirect("/faculty-dashboard");
+    } else if (role === "admin") {
+        redirect("/admin-dashboard");
     } else {
         redirect("/dashboard");
     }

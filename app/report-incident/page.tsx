@@ -17,7 +17,8 @@ import {
 import { submitIncident } from "./actions";
 import { useState, useActionState, useEffect } from "react";
 import Link from "next/link";
-import { HamburgerMenu } from "@/components/hamburger-menu";
+import { PageHeader } from "@/components/page-header";
+import { PageFooter } from "@/components/page-footer";
 import { AiClassifierResult } from "@/components/ai-classifier-result";
 
 const INCIDENT_TYPES = [
@@ -55,32 +56,7 @@ export default function ReportIncidentPage() {
                 background: "var(--gray-a2)",
             }}
         >
-            {/* Header */}
-            <Flex
-                p="4"
-                align="center"
-                justify="between"
-                style={{
-                    background: "var(--color-background)",
-                    borderBottom: "1px solid var(--gray-a5)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 10,
-                }}
-            >
-                <Flex align="center" gap="3">
-                    <Link href="/dashboard" style={{ textDecoration: "none" }}>
-                        <Heading size="5" style={{ color: "var(--accent-9)" }}>
-                            Aura
-                        </Heading>
-                    </Link>
-                    <Separator orientation="vertical" size="2" />
-                    <Text weight="medium">Report Incident</Text>
-                </Flex>
-                <Flex align="center" gap="3">
-                    <HamburgerMenu />
-                </Flex>
-            </Flex>
+            <PageHeader title="Report Incident" />
 
             {/* Main Content */}
             <Container size="2" p="4" style={{ marginTop: "20px" }}>
@@ -301,6 +277,7 @@ export default function ReportIncidentPage() {
                     }
                 `}</style>
             </Container>
+            <PageFooter />
         </Box>
     );
 }
