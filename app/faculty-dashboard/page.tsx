@@ -9,7 +9,8 @@ import {
     Separator,
     Text,
 } from "@radix-ui/themes";
-import { HamburgerMenu } from "@/components/hamburger-menu";
+import { PageHeader } from "@/components/page-header";
+import { PageFooter } from "@/components/page-footer";
 import { FacultyIncidentTable } from "@/components/faculty-incident-table";
 import prisma from "@/lib/db";
 import { getUserRole, canAccessFacultyRoutes } from "@/lib/roles";
@@ -82,30 +83,11 @@ export default async function FacultyDashboardPage() {
                 background: "var(--gray-a2)",
             }}
         >
-            {/* ─── Header ─── */}
-            <Flex
-                align="center"
-                justify="between"
-                wrap="wrap"
-                gap="3"
-                px={{ initial: "4", sm: "6" }}
-                py="3"
-                style={{
-                    borderBottom: "1px solid var(--gray-a5)",
-                    background: "var(--color-background)",
-                    flexShrink: 0,
-                }}
-            >
-                <Flex direction="column" gap="1">
-                    <Heading size={{ initial: "4", sm: "5" }}>Faculty Dashboard</Heading>
-                    <Text size="2" color="gray">
-                        Welcome, {name}!
-                    </Text>
-                </Flex>
-                <Flex align="center" gap="3">
-                    <HamburgerMenu userRole={role} />
-                </Flex>
-            </Flex>
+            <PageHeader
+                title="Faculty Dashboard"
+                subtitle={`Welcome, ${name}!`}
+                userRole={role}
+            />
 
             {/* ─── Main Content ─── */}
             <Flex
@@ -251,6 +233,7 @@ export default async function FacultyDashboardPage() {
                     .hide-on-desktop { display: none !important; }
                 }
             `}</style >
+            <PageFooter />
         </div >
     );
 }

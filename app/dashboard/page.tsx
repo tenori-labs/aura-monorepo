@@ -14,9 +14,10 @@ import {
 } from "@radix-ui/themes";
 import { signout } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { HamburgerMenu } from "@/components/hamburger-menu";
 import prisma from "@/lib/db";
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { PageFooter } from "@/components/page-footer";
 import { getUserRole } from "@/lib/roles";
 import { CheckCircledIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 
@@ -80,30 +81,11 @@ export default async function DashboardPage() {
                 background: "var(--gray-a2)",
             }}
         >
-            {/* ─── Header ─── */}
-            <Flex
-                align="center"
-                justify="between"
-                wrap="wrap"
-                gap="3"
-                px={{ initial: "4", sm: "6" }}
-                py="3"
-                style={{
-                    borderBottom: "1px solid var(--gray-a5)",
-                    background: "var(--color-background)",
-                    flexShrink: 0,
-                }}
-            >
-                <Flex direction="column" gap="1">
-                    <Heading size={{ initial: "4", sm: "5" }}>{userRole === "faculty" ? "Faculty" : "Student"} Dashboard</Heading>
-                    <Text size="2" color="gray">
-                        Welcome, {name}!
-                    </Text>
-                </Flex>
-                <Flex align="center" gap="3">
-                    <HamburgerMenu userRole={userRole} />
-                </Flex>
-            </Flex>
+            <PageHeader
+                title={`${userRole === "faculty" ? "Faculty" : "Student"} Dashboard`}
+                subtitle={`Welcome, ${name}!`}
+                userRole={userRole}
+            />
 
             {/* ─── Main Content (single vertical column) ─── */}
             <Flex
@@ -290,6 +272,7 @@ export default async function DashboardPage() {
                     )}
                 </Flex>
             </Flex>
+            <PageFooter />
         </div>
     );
 }
