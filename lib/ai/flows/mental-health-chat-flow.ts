@@ -14,6 +14,7 @@ const MentalHealthChatInputSchema = z.object({
     newMessage: ChatMessageSchema,
     history: z.array(ChatMessageSchema).optional(),
     isGreeting: z.boolean().optional().default(false),
+    isClarificationResponse: z.boolean().optional().default(false),
 });
 export type MentalHealthChatInput = z.infer<typeof MentalHealthChatInputSchema>;
 
@@ -25,6 +26,10 @@ const GenerationSchema = z.object({
     moodState: z.string().describe("Apparent mood state, e.g. 'Stable', 'Anxious', 'Depressed'."),
     cognitivePatterns: z.array(z.string()).describe("Observed cognitive patterns like 'Catastrophizing', 'Rumination'."),
     counselorNotes: z.string().describe("Brief observations for the counselor."),
+    // ─── Self-harm detection fields ───
+    selfHarmSignal: z.boolean().describe("Set to true if the student's message contains any language suggesting self-harm, self-injury, or suicidal ideation — even ambiguously."),
+    followUpQuestion: z.string().optional().describe("When selfHarmSignal is true, a gentle one-sentence check-in question. Do NOT mention reports, counselors, or alerts."),
+    conversationThemes: z.array(z.string()).optional().describe("General topics observed (e.g. 'academic pressure', 'social isolation'). Themes only, never verbatim quotes."),
 });
 
 // Loose schema for Flow output (fields optional to allow error handling)
@@ -35,6 +40,9 @@ const MentalHealthChatOutputSchema = z.object({
     moodState: z.string().optional(),
     cognitivePatterns: z.array(z.string()).optional(),
     counselorNotes: z.string().optional(),
+    selfHarmSignal: z.boolean().optional(),
+    followUpQuestion: z.string().optional(),
+    conversationThemes: z.array(z.string()).optional(),
     error: z.string().optional(),
 });
 export type MentalHealthChatOutput = z.infer<typeof MentalHealthChatOutputSchema>;
@@ -61,6 +69,22 @@ In your JSON output, fill in the following fields based on your analysis of the 
 - cognitivePatterns: array of observed patterns like "Catastrophizing", "Rumination", "Self-criticism"
 - counselorNotes: brief notes about the conversation for the counselor
 
+SELF-HARM DETECTION:
+If the student's message contains any language suggesting self-harm, self-injury, or suicidal ideation — even ambiguously — set selfHarmSignal to true.
+
+When selfHarmSignal is true:
+- Set followUpQuestion to a gentle, natural check-in that gives the student space to clarify. Do not mention reports, counselors, or alerts.
+- Example: "It sounds like things feel really heavy right now. Are you doing okay?"
+- Keep it conversational. One sentence. Warm tone.
+- The followUpQuestion should ALSO be used as your responseText when selfHarmSignal is true.
+
+When selfHarmSignal is false:
+- Set followUpQuestion to null/empty.
+
+CONVERSATION THEMES (REQUIRED when selfHarmSignal is true):
+Always extract conversationThemes — a list of general topics observed (e.g. "academic pressure", "social isolation", "family stress", "suicidal ideation", "hopelessness"). These are themes only, never verbatim quotes.
+When selfHarmSignal is true, you MUST provide at least one theme. Even for short messages, infer the theme from context (e.g. a message about ending things → ["suicidal ideation", "emotional distress"]). Never return an empty array when selfHarmSignal is true.
+
 Your "responseText" field must contain your natural, empathetic, conversational reply to the student. It should NOT mention any internal analysis fields.
 `;
 
@@ -76,7 +100,7 @@ const mentalHealthChatFlow = ai.defineFlow(
         outputSchema: MentalHealthChatOutputSchema,
     },
     async (flowInput: MentalHealthChatInput) => {
-        const { newMessage, history, isGreeting } = flowInput;
+        const { newMessage, history, isGreeting, isClarificationResponse } = flowInput;
 
         // --- PII Filter: sanitize user message before LLM ---
         const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
@@ -86,7 +110,9 @@ const mentalHealthChatFlow = ai.defineFlow(
 
         let systemPrompt = SYSTEM_INSTRUCTIONS;
         if (isGreeting) {
-            systemPrompt += "\nThis is the first message. Provide a warm greeting as responseText. Default riskAssessment to 'No Risk', anxietyLevel to 'Not Assessed', moodState to 'Neutral', cognitivePatterns to empty array, counselorNotes to 'Initial greeting.'";
+            systemPrompt += "\nThis is the first message. Provide a warm greeting as responseText. Default riskAssessment to 'No Risk', anxietyLevel to 'Not Assessed', moodState to 'Neutral', cognitivePatterns to empty array, counselorNotes to 'Initial greeting.', selfHarmSignal to false, conversationThemes to empty array.";
+        } else if (isClarificationResponse) {
+            systemPrompt += "\nThe user has just responded to your self-harm check-in. Do NOT set selfHarmSignal to true this time. Instead, provide a warm, validating, and supportive response acknowledging their feelings. Focus on creating a safe space.";
         }
 
         try {
@@ -124,7 +150,7 @@ const mentalHealthChatFlow = ai.defineFlow(
             };
 
             const { output } = await ai.generate({
-                model: 'googleai/gemini-2.0-flash',
+                model: 'googleai/gemini-2.0-flash-001',
                 messages: [...formattedHistory, formattedNewMessage],
                 system: systemPrompt,
                 output: { schema: GenerationSchema },
@@ -138,9 +164,16 @@ const mentalHealthChatFlow = ai.defineFlow(
             console.log("Aura Risk Assessment (background):", output.riskAssessment);
             console.log("Aura Mood (background):", output.moodState);
             console.log("Aura Anxiety (background):", output.anxietyLevel);
+            console.log("Aura Self-Harm Signal:", output.selfHarmSignal);
+            if (output.conversationThemes?.length) {
+                console.log("Aura Themes:", output.conversationThemes.join(", "));
+            }
 
             // --- PII Filter: reconstruct PII in Aura's response ---
             const restoredResponse = reconstructPII(sessionId, output.responseText);
+            const restoredFollowUp = output.followUpQuestion
+                ? reconstructPII(sessionId, output.followUpQuestion)
+                : undefined;
             clearPIISession(sessionId);
 
             return {
@@ -150,6 +183,9 @@ const mentalHealthChatFlow = ai.defineFlow(
                 moodState: output.moodState,
                 cognitivePatterns: output.cognitivePatterns,
                 counselorNotes: output.counselorNotes,
+                selfHarmSignal: output.selfHarmSignal,
+                followUpQuestion: restoredFollowUp,
+                conversationThemes: output.conversationThemes,
             };
         } catch (e: any) {
             clearPIISession(sessionId);

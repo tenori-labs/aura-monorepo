@@ -63,3 +63,32 @@ model CategoryAssignment {
   updatedAt    DateTime @updatedAt
 }
 
+// ─── Wellbeing Reporting System ───────────────────────────────────
+
+/// AI-generated neutral wellbeing report triggered by self-harm detection.
+/// `reportText` NEVER contains the student's name.
+/// `studentName` is stored separately, visible only to internal staff.
+model WellbeingReport {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  caseId        String           @unique @default(cuid())
+  uid           String           // Supabase user ID
+  studentName   String           // internal only, never in reportText
+  generatedAt   DateTime         @default(now())
+  reportText    String           // neutral summary — no name inside
+  themes        String[]
+  status        String           @default("pending")
+  // status: "pending" | "reviewed" | "passed_on" | "closed"
+  accessLog     IdentityAccess[]
+}
+
+/// Audit log tracking who viewed a student's identity in a wellbeing report.
+model IdentityAccess {
+  id         String          @id @default(auto()) @map("_id") @db.ObjectId
+  reportId   String          @db.ObjectId
+  accessedBy String          // staff Supabase user ID
+  accessedAt DateTime        @default(now())
+  reason     String          // free text, required
+  report     WellbeingReport @relation(fields: [reportId], references: [id])
+}
+
+

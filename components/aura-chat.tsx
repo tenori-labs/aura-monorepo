@@ -6,6 +6,7 @@ import {
     type MentalHealthChatInput,
     type ChatMessage,
 } from "@/lib/ai/flows/mental-health-chat-flow";
+import { handleClarification, generateAndStoreReport } from "@/app/well-being/actions";
 import {
     Avatar,
     Badge,
@@ -36,6 +37,13 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Clarification state
+    const [awaitingClarification, setAwaitingClarification] = useState(false);
+    const [flaggedContext, setFlaggedContext] = useState<{
+        themes: string[];
+        originalMessage: string;
+    } | null>(null);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -50,6 +58,7 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
                     newMessage: { role: "user", content: "Hello Aura" },
                     history: [],
                     isGreeting: true,
+                    isClarificationResponse: false,
                 };
                 const response = await mentalHealthChat(initialInput);
                 if (response.responseText) {
@@ -84,22 +93,73 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
 
-        const newUserMessage: ChatMessage = { role: "user", content: input.trim() };
+        const userMessageContent = input.trim();
+        const newUserMessage: ChatMessage = { role: "user", content: userMessageContent };
         setMessages((prev) => [...prev, newUserMessage]);
         setInput("");
         setIsLoading(true);
 
         try {
-            const chatInput: MentalHealthChatInput = {
+            // Check if we are in the clarification flow (user is responding to "Are you okay?")
+            let reportGenerated = false;
+            const wasAwaitingClarification = awaitingClarification && flaggedContext;
+
+            if (wasAwaitingClarification) {
+                // 1. Run clarification assessment
+                const clarificationResult = await handleClarification({
+                    originalMessage: flaggedContext.originalMessage,
+                    studentClarification: userMessageContent,
+                });
+
+                if (clarificationResult.isGenuineDistress) {
+                    // 2. Generate and store report (fire and forget, or await?)
+                    // Await it to ensure it's saved before we continue, though it adds latency.
+                    // Let's await to be safe.
+                    await generateAndStoreReport({
+                        themes: flaggedContext.themes,
+                        clarificationSummary: clarificationResult.summary,
+                        studentName: userName,
+                        uid: userId,
+                    });
+                    reportGenerated = true;
+                }
+
+                // Reset clarification state
+                setAwaitingClarification(false);
+                setFlaggedContext(null);
+            }
+
+            // Correct logic for isClarificationResponse:
+            // We want it true if we *were* awaiting clarification at the start of this submit.
+            // Since we reset awaitingClarification above, we need to capture the fact.
+            // Actually, we can just use the `if (awaitingClarification)` block to set a flag.
+
+            // Re-defining chatInput to use the local flag
+            const finalChatInput: MentalHealthChatInput = {
                 studentId: userId,
                 newMessage: newUserMessage,
                 history: messages,
                 isGreeting: false,
+                isClarificationResponse: Boolean(wasAwaitingClarification), // flaggedContext is not null if we were awaiting
             };
-            const response = await mentalHealthChat(chatInput);
+
+            const response = await mentalHealthChat(finalChatInput);
 
             if (response.responseText) {
                 setMessages((prev) => [...prev, { role: "model", content: response.responseText! }]);
+
+                // Check if NEW self-harm signal is detected (only if not already in clarification flow)
+                // If isClarificationResponse was true, the system prompt *should* prevent this, but check anyway.
+                if (response.selfHarmSignal && !finalChatInput.isClarificationResponse) {
+                    setAwaitingClarification(true);
+                    setFlaggedContext({
+                        themes: response.conversationThemes || [],
+                        // Raw message stored in client state — clarifyDistress flow
+                        // will sanitize both originalMessage and studentClarification
+                        // server-side before sending to Gemini.
+                        originalMessage: userMessageContent,
+                    });
+                }
             } else if (response.error) {
                 setMessages((prev) => [
                     ...prev,
@@ -121,6 +181,7 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
             setIsLoading(false);
         }
     };
+
 
     const initials = userName.charAt(0).toUpperCase();
 
