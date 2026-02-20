@@ -2,20 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
     Avatar,
-    Badge,
     Box,
     Button,
     Card,
     Flex,
-    Grid,
     Heading,
     Separator,
     Text,
 } from "@radix-ui/themes";
-import { signout } from "@/app/auth/actions";
-import { ThemeToggle } from "@/components/theme-toggle";
 import prisma from "@/lib/db";
 import Link from "next/link";
+import { StudentIncidentDialog } from "@/components/student-incident-dialog";
 import { PageHeader } from "@/components/page-header";
 import { PageFooter } from "@/components/page-footer";
 import { getUserRole } from "@/lib/roles";
@@ -53,12 +50,19 @@ export default async function DashboardPage() {
     });
     const hasConsented = !!consentRecord;
 
+    // Fetch category assignments for timeline display
+    const allAssignments = await prisma.categoryAssignment.findMany();
+    const categoryAssignmentMap: Record<string, string> = {};
+    for (const a of allAssignments) {
+        categoryAssignmentMap[a.category] = a.facultyEmail;
+    }
+
     // Helper to get status badge color
     const getStatusColor = (status: string) => {
         switch (status) {
             case "pending": return "blue" as const;
             case "reviewing": return "orange" as const;
-            case "resolved": return "green" as const;
+            case "closed": return "green" as const;
             default: return "gray" as const;
         }
     };
@@ -199,76 +203,10 @@ export default async function DashboardPage() {
                             </Flex>
                         </Card>
                     ) : (
-                        incidents.map((incident) => (
-                            <Card
-                                key={incident.id}
-                                size="2"
-                            >
-                                <Flex justify="between" align="start" gap="2" mb="2">
-                                    <Heading size="3" style={{ flex: 1 }}>
-                                        {incident.aiAnalysis?.category ?? incident.incidentType}: {incident.location}
-                                    </Heading>
-                                    <Badge
-                                        color={getStatusColor(incident.status)}
-                                        size="1"
-                                        style={{ flexShrink: 0, textTransform: "capitalize" }}
-                                    >
-                                        {incident.status}
-                                    </Badge>
-                                </Flex>
-
-                                <Text size="1" color="gray" mb="2" style={{ display: "block" }}>
-                                    Reported: {formatDate(incident.createdAt)}
-                                </Text>
-
-                                <Text as="p" size="2" mb="3" style={{ lineHeight: 1.5 }}>
-                                    {incident.description}
-                                </Text>
-
-                                <Separator size="4" mb="3" />
-
-                                {/* AI Classification */}
-                                {incident.aiAnalysis && (
-                                    <Flex direction="column" gap="2">
-                                        <Text size="1" color="gray">AI Classification:</Text>
-                                        <Flex align="center" gap="2" wrap="wrap">
-                                            <Badge variant="surface" size="1">
-                                                {incident.aiAnalysis.category}
-                                            </Badge>
-                                            <Text size="1" color="gray">
-                                                (Confidence: {Math.round(incident.aiAnalysis.confidence * 100)}%)
-                                            </Text>
-                                            <Badge
-                                                color={
-                                                    incident.aiAnalysis.validity === "Likely Valid" ? "green" :
-                                                        incident.aiAnalysis.validity === "Needs Review" ? "orange" : "red"
-                                                }
-                                                size="1"
-                                                variant="soft"
-                                            >
-                                                {incident.aiAnalysis.validity}
-                                            </Badge>
-                                        </Flex>
-                                        <Flex gap="1" wrap="wrap" mt="1">
-                                            <Text size="1" color="gray">Keywords:</Text>
-                                            {incident.aiAnalysis.keywords.map((kw) => (
-                                                <Badge
-                                                    key={kw}
-                                                    variant="soft"
-                                                    color="gray"
-                                                    size="1"
-                                                >
-                                                    {kw}
-                                                </Badge>
-                                            ))}
-                                        </Flex>
-                                        <Text size="1" color="gray" mt="1">
-                                            Last updated: {formatDate(incident.updatedAt)}
-                                        </Text>
-                                    </Flex>
-                                )}
-                            </Card>
-                        ))
+                        <StudentIncidentDialog
+                            incidents={JSON.parse(JSON.stringify(incidents))}
+                            categoryAssignments={categoryAssignmentMap}
+                        />
                     )}
                 </Flex>
             </Flex>

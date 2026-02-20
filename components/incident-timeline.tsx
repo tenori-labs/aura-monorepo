@@ -3,24 +3,21 @@
 import { Flex, Text, Box } from "@radix-ui/themes";
 import {
     FileTextIcon,
-    PersonIcon,
     MagnifyingGlassIcon,
     CheckCircledIcon,
 } from "@radix-ui/react-icons";
 
 /**
- * The 4 stages of an incident report lifecycle.
+ * The 3 stages of an incident report lifecycle.
  */
 const STAGES = [
     { key: "pending", label: "Submitted", icon: FileTextIcon },
-    { key: "assigned", label: "Assigned", icon: PersonIcon },
-    { key: "reviewing", label: "Under Review", icon: MagnifyingGlassIcon },
-    { key: "resolved", label: "Completed", icon: CheckCircledIcon },
+    { key: "reviewing", label: "In Review", icon: MagnifyingGlassIcon },
+    { key: "closed", label: "Closed", icon: CheckCircledIcon },
 ] as const;
 
 function getStageIndex(status: string): number {
     const idx = STAGES.findIndex((s) => s.key === status);
-    if (status === "closed") return STAGES.length - 1;
     return idx >= 0 ? idx : 0;
 }
 
@@ -30,10 +27,7 @@ interface Props {
 }
 
 export function IncidentTimeline({ status, assignedTo }: Props) {
-    // If a faculty is assigned (via live category assignment), show at least the "assigned" stage
-    const baseIndex = getStageIndex(status);
-    const assignedIndex = getStageIndex("assigned");
-    const currentIndex = assignedTo && baseIndex < assignedIndex ? assignedIndex : baseIndex;
+    const currentIndex = getStageIndex(status);
 
     return (
         <Flex direction="column" gap="0" py="2">
@@ -83,13 +77,12 @@ export function IncidentTimeline({ status, assignedTo }: Props) {
                                 >
                                     {stage.label}
                                 </Text>
-                                {/* Show "Assigned to" info for stage 2 */}
-                                {stage.key === "assigned" && isActive && (
+                                {/* Show assigned faculty info on the "In Review" stage */}
+                                {stage.key === "reviewing" && isActive && assignedTo && (
                                     <Text size="1" color="gray">
-                                        {assignedTo || "Not yet assigned"}
+                                        {assignedTo}
                                     </Text>
                                 )}
-                                {/* Show checkmark text for completed stages */}
                                 {isCompleted && (
                                     <Text size="1" color="green">
                                         Done
@@ -103,13 +96,13 @@ export function IncidentTimeline({ status, assignedTo }: Props) {
                             </Flex>
                         </Flex>
 
-                        {/* Connecting line — flush between icons */}
+                        {/* Connecting line */}
                         {!isLast && (
                             <Box
                                 style={{
                                     width: 2,
                                     height: 24,
-                                    marginLeft: 17, // center under 36px icon
+                                    marginLeft: 17,
                                     background: i < currentIndex
                                         ? "var(--accent-9)"
                                         : "var(--gray-a4)",

@@ -96,9 +96,30 @@ export async function removeAssignment(category: string) {
     }
 
     try {
+        // Get the current assignment so we know which faculty to un-assign
+        const assignment = await prisma.categoryAssignment.findUnique({
+            where: { category },
+        });
+
         await prisma.categoryAssignment.delete({
             where: { category },
         });
+
+        // Reset any incidents that were assigned to this faculty under this category
+        if (assignment) {
+            await prisma.incidentReport.updateMany({
+                where: {
+                    incidentType: category,
+                    assignedTo: assignment.facultyId,
+                    status: "pending", // only reset if still in "pending" stage
+                },
+                data: {
+                    assignedTo: null,
+                    assignedToEmail: null,
+                    status: "pending",
+                },
+            });
+        }
     } catch {
         // Assignment didn't exist, that's fine
     }

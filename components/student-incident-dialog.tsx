@@ -1,24 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
     Badge,
     Box,
     Card,
     Dialog,
     Flex,
-    Select,
     Separator,
     Table,
     Text,
-    TextArea,
 } from "@radix-ui/themes";
 import { Button } from "@radix-ui/themes";
 import { IncidentTimeline } from "@/components/incident-timeline";
-import { updateIncidentStatus, updateIncidentNotes } from "@/app/faculty-dashboard/incident-actions";
 
-// Type matching the Prisma IncidentReport model
 interface AiAnalysis {
     category: string;
     confidence: number;
@@ -32,7 +27,7 @@ interface IncidentReport {
     userId: string | null;
     userEmail: string | null;
     incidentType: string;
-    dateTime: Date;
+    dateTime: string;
     location: string;
     description: string;
     email: string | null;
@@ -43,148 +38,56 @@ interface IncidentReport {
     status: string;
     assignedTo: string | null;
     assignedToEmail: string | null;
-    facultyNotes: string | null;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string;
+    updatedAt: string;
 }
 
 interface Props {
     incidents: IncidentReport[];
-    categoryAssignments: Record<string, string>; // category -> faculty name
-    assignedCategories: string[]; // categories this faculty has access to
-    allCategories: string[]; // all 6 incident categories
-    isAdmin: boolean; // admins see everything
+    categoryAssignments: Record<string, string>;
 }
 
-const getStatusColor = (status: string) => {
+function getStatusColor(status: string) {
     switch (status) {
         case "pending": return "blue" as const;
         case "reviewing": return "orange" as const;
         case "closed": return "green" as const;
         default: return "gray" as const;
     }
-};
+}
 
-const getValidityColor = (validity: string) => {
-    switch (validity) {
-        case "Likely Valid": return "green" as const;
-        case "Needs Review": return "orange" as const;
-        case "Invalid": return "red" as const;
-        default: return "gray" as const;
-    }
-};
+function getValidityColor(validity: string) {
+    if (validity === "Likely Valid") return "green" as const;
+    if (validity === "Needs Review") return "orange" as const;
+    return "red" as const;
+}
 
-const formatDate = (date: Date) => {
+function formatDate(date: string) {
     return new Date(date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+        month: "short", day: "numeric", year: "numeric",
     });
-};
+}
 
-const formatDateTime = (date: Date) => {
+function formatDateTime(date: string) {
     return new Date(date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+        month: "short", day: "numeric", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
     });
-};
+}
 
-const shortId = (id: string) => `RPT-${id.slice(-4).toUpperCase()}`;
+function shortId(id: string) {
+    return id.length > 8 ? `#${id.slice(-6).toUpperCase()}` : `#${id}`;
+}
 
-export function FacultyIncidentTable({ incidents, categoryAssignments, assignedCategories, allCategories, isAdmin }: Props) {
-    const router = useRouter();
+export function StudentIncidentDialog({ incidents, categoryAssignments }: Props) {
     const [selected, setSelected] = useState<IncidentReport | null>(null);
     const [showTimeline, setShowTimeline] = useState(false);
-    const [categoryFilter, setCategoryFilter] = useState<string>("all");
-    const [newStatus, setNewStatus] = useState<string>("");
-    const [notes, setNotes] = useState<string>("");
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-    // When a new incident is selected, populate the form fields
-    const handleSelect = (incident: IncidentReport) => {
-        setSelected(incident);
-        setNewStatus(incident.status);
-        setNotes(incident.facultyNotes ?? "");
-        setSaveMessage(null);
-    };
-
-    const handleSave = async () => {
-        if (!selected) return;
-        setIsSaving(true);
-        setSaveMessage(null);
-
-        try {
-            const [statusResult, notesResult] = await Promise.all([
-                updateIncidentStatus(selected.id, newStatus),
-                updateIncidentNotes(selected.id, notes),
-            ]);
-
-            if (statusResult.error) {
-                setSaveMessage({ type: "error", text: statusResult.error });
-                return;
-            }
-            if (notesResult.error) {
-                setSaveMessage({ type: "error", text: notesResult.error });
-                return;
-            }
-
-            // Update local state so UI reflects immediately
-            setSelected({ ...selected, status: newStatus, facultyNotes: notes });
-            setSaveMessage({ type: "success", text: "Saved successfully" });
-            router.refresh(); // re-fetch server data so the table updates
-        } catch {
-            setSaveMessage({ type: "error", text: "An unexpected error occurred." });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    // Filter incidents by selected category
-    const filteredIncidents = categoryFilter === "all"
-        ? incidents
-        : incidents.filter((i) => i.incidentType === categoryFilter);
 
     return (
         <>
-            {/* ─── Category Filter ─── */}
-            <Card size="2" mb="3">
-                <Flex align="center" gap="3" wrap="wrap">
-                    <Text size="2" weight="medium" style={{ flexShrink: 0 }}>Filter by Category:</Text>
-                    <Select.Root
-                        size="2"
-                        value={categoryFilter}
-                        onValueChange={setCategoryFilter}
-                    >
-                        <Select.Trigger style={{ minWidth: 200 }} />
-                        <Select.Content>
-                            <Select.Item value="all">All Assigned ({incidents.length})</Select.Item>
-                            <Select.Separator />
-                            {allCategories.map((cat) => {
-                                const hasAccess = isAdmin || assignedCategories.includes(cat);
-                                const count = incidents.filter((i) => i.incidentType === cat).length;
-                                return (
-                                    <Select.Item
-                                        key={cat}
-                                        value={cat}
-                                        disabled={!hasAccess}
-                                    >
-                                        {cat} {hasAccess ? `(${count})` : "— No Access"}
-                                    </Select.Item>
-                                );
-                            })}
-                        </Select.Content>
-                    </Select.Root>
-                </Flex>
-            </Card>
-
             {/* ─── Detail Popup Dialog ─── */}
-            <Dialog.Root open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+            <Dialog.Root open={!!selected} onOpenChange={(open) => { if (!open) { setSelected(null); setShowTimeline(false); } }}>
                 <Dialog.Content
-                    className="incident-detail-dialog"
                     style={{
                         maxWidth: 520,
                         width: "calc(100vw - 32px)",
@@ -236,7 +139,7 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                                     WebkitOverflowScrolling: "touch",
                                 }}
                             >
-                                {/* Report Details Grid */}
+                                {/* Report Details */}
                                 <Flex direction="column" gap="3">
                                     <Box>
                                         <Text size="1" color="gray" mb="1" style={{ display: "block" }}>Type</Text>
@@ -250,14 +153,6 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                                         <Text size="1" color="gray" mb="1" style={{ display: "block" }}>Incident Date</Text>
                                         <Text size="2" weight="medium">{formatDateTime(selected.dateTime)}</Text>
                                     </Box>
-                                    {selected.userEmail && (
-                                        <Box>
-                                            <Text size="1" color="gray" mb="1" style={{ display: "block" }}>Reported By</Text>
-                                            <Text size="2" weight="medium" style={{ wordBreak: "break-all" }}>
-                                                {selected.userEmail}
-                                            </Text>
-                                        </Box>
-                                    )}
                                 </Flex>
 
                                 <Separator size="4" my="3" />
@@ -338,53 +233,6 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                                         </Box>
                                     </>
                                 )}
-
-                                {/* ─── Faculty Actions & Updates ─── */}
-                                <Separator size="4" my="3" />
-                                <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>
-                                    Faculty Actions & Updates
-                                </Text>
-                                <Text size="1" color="gray" mb="3" style={{ display: "block" }}>
-                                    Update the incident status and add your notes here.
-                                </Text>
-
-                                <Flex direction="column" gap="3">
-                                    {/* Status Dropdown */}
-                                    <Box>
-                                        <Text size="1" color="gray" mb="1" style={{ display: "block" }}>Update Incident Status</Text>
-                                        <Select.Root
-                                            size="2"
-                                            value={newStatus}
-                                            onValueChange={setNewStatus}
-                                        >
-                                            <Select.Trigger style={{ width: "100%" }} />
-                                            <Select.Content>
-                                                <Select.Item value="pending">Pending</Select.Item>
-                                                <Select.Item value="reviewing">In Review</Select.Item>
-                                                <Select.Item value="closed">Closed</Select.Item>
-                                            </Select.Content>
-                                        </Select.Root>
-                                    </Box>
-
-                                    {/* Notes Textarea */}
-                                    <Box>
-                                        <Text size="1" color="gray" mb="1" style={{ display: "block" }}>Faculty Notes / Observations</Text>
-                                        <TextArea
-                                            placeholder="Add your notes, findings, or actions taken..."
-                                            value={notes}
-                                            onChange={(e) => setNotes(e.target.value)}
-                                            rows={4}
-                                            style={{ width: "100%" }}
-                                        />
-                                    </Box>
-
-                                    {/* Save Message */}
-                                    {saveMessage && (
-                                        <Text size="1" color={saveMessage.type === "success" ? "green" : "red"} weight="medium">
-                                            {saveMessage.text}
-                                        </Text>
-                                    )}
-                                </Flex>
                             </Box>
 
                             {/* ─── Sticky Footer ─── */}
@@ -401,18 +249,9 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                                         variant="solid"
                                         size="3"
                                         style={{ width: "100%" }}
-                                        onClick={handleSave}
-                                        disabled={isSaving}
-                                    >
-                                        {isSaving ? "Saving..." : "Save Update"}
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="3"
-                                        style={{ width: "100%" }}
                                         onClick={() => setShowTimeline(true)}
                                     >
-                                        Check Status
+                                        View Status Timeline
                                     </Button>
                                     <Dialog.Close>
                                         <Button
@@ -429,11 +268,10 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                         </>
                     )}
                 </Dialog.Content>
-            </Dialog.Root >
+            </Dialog.Root>
 
             {/* ─── Status Timeline Dialog (nested) ─── */}
-            < Dialog.Root open={showTimeline} onOpenChange={(open) => { if (!open) setShowTimeline(false); }
-            }>
+            <Dialog.Root open={showTimeline} onOpenChange={(open) => { if (!open) setShowTimeline(false); }}>
                 <Dialog.Content
                     style={{
                         maxWidth: 400,
@@ -463,17 +301,21 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                         />
                     </Box>
                     <Box px="4" py="3" style={{ borderTop: "1px solid var(--gray-a4)", flexShrink: 0 }}>
-                        <Dialog.Close>
-                            <Button variant="soft" color="gray" size="3" style={{ width: "100%" }}>
-                                Back
-                            </Button>
-                        </Dialog.Close>
+                        <Button
+                            variant="soft"
+                            color="gray"
+                            size="3"
+                            style={{ width: "100%" }}
+                            onClick={() => setShowTimeline(false)}
+                        >
+                            Back
+                        </Button>
                     </Box>
                 </Dialog.Content>
-            </Dialog.Root >
+            </Dialog.Root>
 
-            {/* ─── Desktop Table (hidden on mobile) ─── */}
-            < Card size="2" style={{ overflow: "hidden" }} className="hide-on-mobile" >
+            {/* ─── Reports Table ─── */}
+            <Card size="2" style={{ overflow: "hidden" }}>
                 <Box style={{ overflowX: "auto" }}>
                     <Table.Root variant="surface">
                         <Table.Header>
@@ -487,10 +329,10 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                             </Table.Row>
                         </Table.Header>
                         <Table.Body>
-                            {filteredIncidents.map((incident) => (
+                            {incidents.map((incident) => (
                                 <Table.Row
                                     key={incident.id}
-                                    onClick={() => handleSelect(incident)}
+                                    onClick={() => setSelected(incident)}
                                     style={{ cursor: "pointer", transition: "background 0.1s" }}
                                     onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-a3)"}
                                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
@@ -537,73 +379,7 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                         </Table.Body>
                     </Table.Root>
                 </Box>
-            </Card >
-
-            {/* ─── Mobile Card View (hidden on desktop) ─── */}
-            < Flex direction="column" gap="3" className="hide-on-desktop" >
-                {
-                    filteredIncidents.map((incident) => (
-                        <Card
-                            key={incident.id}
-                            size="2"
-                            onClick={() => handleSelect(incident)}
-                            style={{ cursor: "pointer", transition: "background 0.1s" }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-a2)"}
-                            onMouseLeave={(e) => e.currentTarget.style.background = ""}
-                        >
-                            <Flex justify="between" align="start" gap="2" mb="2">
-                                <Flex direction="column" gap="1" style={{ flex: 1 }}>
-                                    <Text size="1" color="gray" style={{ fontFamily: "monospace" }}>
-                                        {shortId(incident.id)}
-                                    </Text>
-                                    <Text size="3" weight="bold">
-                                        {incident.incidentType}
-                                    </Text>
-                                </Flex>
-                                <Badge
-                                    color={getStatusColor(incident.status)}
-                                    size="1"
-                                    variant="soft"
-                                    style={{ textTransform: "capitalize", flexShrink: 0 }}
-                                >
-                                    {incident.status}
-                                </Badge>
-                            </Flex>
-
-                            <Separator size="4" mb="2" />
-
-                            <Flex direction="column" gap="1">
-                                <Flex justify="between" gap="1">
-                                    <Text size="1" color="gray">Location</Text>
-                                    <Text size="1" weight="medium">{incident.location}</Text>
-                                </Flex>
-                                <Flex justify="between" gap="1">
-                                    <Text size="1" color="gray">Date</Text>
-                                    <Text size="1" weight="medium">{formatDate(incident.createdAt)}</Text>
-                                </Flex>
-                                <Flex justify="between" gap="1">
-                                    <Text size="1" color="gray">AI Validity</Text>
-                                    {incident.aiAnalysis ? (
-                                        <Badge
-                                            color={getValidityColor(incident.aiAnalysis.validity)}
-                                            size="1"
-                                            variant="soft"
-                                        >
-                                            {incident.aiAnalysis.validity}
-                                        </Badge>
-                                    ) : (
-                                        <Text size="1" color="gray">N/A</Text>
-                                    )}
-                                </Flex>
-                            </Flex>
-
-                            <Text size="1" color="blue" mt="2" style={{ display: "block", textAlign: "right" }}>
-                                Tap to view details →
-                            </Text>
-                        </Card>
-                    ))
-                }
-            </Flex >
+            </Card>
         </>
     );
 }
