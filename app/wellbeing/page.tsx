@@ -79,6 +79,15 @@ export default async function WellbeingReportsPage() {
                 )}
             </Flex>
 
+            {/* Responsive Styles */}
+            <style>{`
+                @media (max-width: 640px) {
+                    .hide-on-mobile { display: none !important; }
+                }
+                @media (min-width: 641px) {
+                    .hide-on-desktop { display: none !important; }
+                }
+            `}</style>
             <PageFooter />
         </div>
     );

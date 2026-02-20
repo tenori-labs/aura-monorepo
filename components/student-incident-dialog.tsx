@@ -314,8 +314,8 @@ export function StudentIncidentDialog({ incidents, categoryAssignments }: Props)
                 </Dialog.Content>
             </Dialog.Root>
 
-            {/* ─── Reports Table ─── */}
-            <Card size="2" style={{ overflow: "hidden" }}>
+            {/* ─── Reports Table (desktop) ─── */}
+            <Card size="2" style={{ overflow: "hidden" }} className="hide-on-mobile">
                 <Box style={{ overflowX: "auto" }}>
                     <Table.Root variant="surface">
                         <Table.Header>
@@ -380,6 +380,70 @@ export function StudentIncidentDialog({ incidents, categoryAssignments }: Props)
                     </Table.Root>
                 </Box>
             </Card>
+
+            {/* ─── Reports Cards (mobile) ─── */}
+            <Flex direction="column" gap="3" className="hide-on-desktop">
+                {incidents.map((incident) => (
+                    <Card
+                        key={incident.id}
+                        size="2"
+                        onClick={() => setSelected(incident)}
+                        style={{ cursor: "pointer", transition: "background 0.1s" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-a2)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = ""}
+                    >
+                        <Flex justify="between" align="start" gap="2" mb="2">
+                            <Flex direction="column" gap="1" style={{ flex: 1 }}>
+                                <Text size="1" color="gray" style={{ fontFamily: "monospace" }}>
+                                    {shortId(incident.id)}
+                                </Text>
+                                <Text size="3" weight="bold">
+                                    {incident.incidentType}
+                                </Text>
+                            </Flex>
+                            <Badge
+                                color={getStatusColor(incident.status)}
+                                size="1"
+                                variant="soft"
+                                style={{ textTransform: "capitalize", flexShrink: 0 }}
+                            >
+                                {incident.status}
+                            </Badge>
+                        </Flex>
+
+                        <Separator size="4" mb="2" />
+
+                        <Flex direction="column" gap="1">
+                            <Flex justify="between" gap="1">
+                                <Text size="1" color="gray">Location</Text>
+                                <Text size="1" weight="medium">{incident.location}</Text>
+                            </Flex>
+                            <Flex justify="between" gap="1">
+                                <Text size="1" color="gray">Date</Text>
+                                <Text size="1" weight="medium">{formatDate(incident.createdAt)}</Text>
+                            </Flex>
+                            <Flex justify="between" gap="1">
+                                <Text size="1" color="gray">AI Validity</Text>
+                                {incident.aiAnalysis ? (
+                                    <Badge
+                                        color={getValidityColor(incident.aiAnalysis.validity)}
+                                        size="1"
+                                        variant="soft"
+                                    >
+                                        {incident.aiAnalysis.validity}
+                                    </Badge>
+                                ) : (
+                                    <Text size="1" color="gray">N/A</Text>
+                                )}
+                            </Flex>
+                        </Flex>
+
+                        <Text size="1" color="blue" mt="2" style={{ display: "block", textAlign: "right" }}>
+                            Tap to view details →
+                        </Text>
+                    </Card>
+                ))}
+            </Flex>
         </>
     );
 }

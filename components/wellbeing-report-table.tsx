@@ -147,7 +147,7 @@ export function WellbeingReportTable({ reports }: Props) {
 
     return (
         <>
-            <Card size="2" style={{ overflow: "hidden" }}>
+            <Card size="2" style={{ overflow: "hidden" }} className="hide-on-mobile">
                 <Box style={{ overflowX: "auto" }}>
                     <Table.Root variant="surface">
                         <Table.Header>
@@ -220,17 +220,88 @@ export function WellbeingReportTable({ reports }: Props) {
                 </Box>
             </Card>
 
+            {/* ─── Reports Cards (mobile) ─── */}
+            <Flex direction="column" gap="3" className="hide-on-desktop">
+                {reports.map((report) => (
+                    <Card
+                        key={report.id}
+                        size="2"
+                        onClick={() => onSelect(report)}
+                        style={{ cursor: "pointer", transition: "background 0.1s" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-a2)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = ""}
+                    >
+                        <Flex justify="between" align="start" gap="2" mb="2">
+                            <Flex direction="column" gap="1" style={{ flex: 1 }}>
+                                <Text size="1" color="gray" style={{ fontFamily: "monospace" }}>
+                                    {report.caseId}
+                                </Text>
+                                {report.summary ? (
+                                    <Text size="2" weight="bold" style={{ lineHeight: 1.4 }}>
+                                        {report.summary.length > 60 ? report.summary.slice(0, 60) + "…" : report.summary}
+                                    </Text>
+                                ) : (
+                                    <Text size="2" weight="bold">Wellbeing Alert</Text>
+                                )}
+                            </Flex>
+                            <Badge
+                                color={getStatusColor(report.status)}
+                                size="1"
+                                variant="soft"
+                                style={{ textTransform: "capitalize", flexShrink: 0 }}
+                            >
+                                {report.status}
+                            </Badge>
+                        </Flex>
+
+                        <Separator size="4" mb="2" />
+
+                        <Flex direction="column" gap="1">
+                            <Flex justify="between" gap="1">
+                                <Text size="1" color="gray">Date</Text>
+                                <Text size="1" weight="medium">{formatDate(report.generatedAt)}</Text>
+                            </Flex>
+                            <Flex justify="between" gap="1">
+                                <Text size="1" color="gray">Risk Level</Text>
+                                {report.riskLevel ? (
+                                    <Badge color={getRiskColor(report.riskLevel)} size="1" variant="solid" style={{ textTransform: "capitalize" }}>
+                                        {getRiskIcon(report.riskLevel)} {report.riskLevel}
+                                    </Badge>
+                                ) : (
+                                    <Text size="1" color="gray">—</Text>
+                                )}
+                            </Flex>
+                            <Flex justify="between" gap="1" align="center">
+                                <Text size="1" color="gray">Themes</Text>
+                                <Flex gap="1" wrap="wrap" justify="end" style={{ maxWidth: "65%" }}>
+                                    {report.themes.slice(0, 2).map(t => (
+                                        <Badge key={t} variant="soft" color="gray" size="1">{t}</Badge>
+                                    ))}
+                                    {report.themes.length > 2 && (
+                                        <Badge variant="soft" color="gray" size="1">+{report.themes.length - 2}</Badge>
+                                    )}
+                                </Flex>
+                            </Flex>
+                        </Flex>
+
+                        <Text size="1" color="blue" mt="2" style={{ display: "block", textAlign: "right" }}>
+                            Tap to view details →
+                        </Text>
+                    </Card>
+                ))}
+            </Flex>
+
             {/* ─── Detail Dialog ─── */}
             <Dialog.Root open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
-                <Dialog.Content style={{ maxWidth: 620, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0 }}>
+                <Dialog.Content style={{ maxWidth: 620, width: "calc(100vw - 32px)", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: 0 }}>
                     {selected && (
                         <>
                             {/* ─── Header ─── */}
-                            <Box px="5" pt="5" pb="3">
+                            <Box px={{ initial: "3", sm: "5" }} pt={{ initial: "3", sm: "5" }} pb="3" style={{ borderBottom: "1px solid var(--gray-a4)", flexShrink: 0 }}>
                                 <Dialog.Title mb="1">
-                                    Wellbeing Report: <Text style={{ fontFamily: "monospace" }}>{selected.caseId}</Text>
+                                    <Text size={{ initial: "3", sm: "5" }}>Wellbeing Report: <Text style={{ fontFamily: "monospace" }}>{selected.caseId}</Text></Text>
                                 </Dialog.Title>
-                                <Flex justify="between" align="center" mt="2">
+                                <Flex justify="between" align="center" mt="2" wrap="wrap" gap="2">
                                     <Flex gap="2" align="center">
                                         <Badge color={getStatusColor(selected.status)} size="2" variant="soft" style={{ textTransform: "capitalize" }}>
                                             {selected.status}
@@ -246,7 +317,7 @@ export function WellbeingReportTable({ reports }: Props) {
                             </Box>
 
                             {/* ─── Scrollable Body ─── */}
-                            <Box px="5" pb="4" style={{ flex: 1, overflowY: "auto" }}>
+                            <Box px={{ initial: "3", sm: "5" }} pb="4" style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
                                 {/* ─── Summary ─── */}
                                 {selected.summary && (
@@ -489,7 +560,7 @@ export function WellbeingReportTable({ reports }: Props) {
                             </Box>
 
                             {/* ─── Footer ─── */}
-                            <Flex gap="3" justify="end" px="5" py="4" style={{ borderTop: "1px solid var(--gray-a4)" }}>
+                            <Flex gap="2" justify="end" px={{ initial: "3", sm: "5" }} py="3" wrap="wrap" style={{ borderTop: "1px solid var(--gray-a4)", flexShrink: 0 }}>
                                 <Dialog.Close>
                                     <Button variant="soft" color="gray">Close</Button>
                                 </Dialog.Close>
