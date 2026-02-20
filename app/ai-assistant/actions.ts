@@ -30,21 +30,26 @@ export async function generateAndStoreReport(input: {
 }) {
     const { themes, clarificationSummary, studentName, uid } = input;
 
-    // Generate the neutral report (themes-only, no names, no quotes)
-    const reportText = await generateNeutralReport(themes, clarificationSummary);
+    // Generate structured report (themes-only, no names, no quotes)
+    const structured = await generateNeutralReport(themes, clarificationSummary);
 
-    // Store in MongoDB
+    // Store in MongoDB with all structured fields
     const report = await prisma.wellbeingReport.create({
         data: {
             uid,
             studentName,
-            reportText,
+            reportText: structured.reportText,
             themes,
             status: 'pending',
+            riskLevel: structured.riskLevel,
+            summary: structured.summary,
+            observedBehaviors: structured.observedBehaviors,
+            recommendedActions: structured.recommendedActions,
+            contextNotes: structured.contextNotes,
         },
     });
 
-    console.log(`[Wellbeing] Report created: caseId=${report.caseId}, uid=${uid}`);
+    console.log(`[Wellbeing] Report created: caseId=${report.caseId}, uid=${uid}, risk=${structured.riskLevel}`);
 
     return {
         caseId: report.caseId,

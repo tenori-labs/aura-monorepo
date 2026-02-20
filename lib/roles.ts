@@ -1,7 +1,7 @@
 export type UserRole = "student" | "faculty" | "admin";
 
 /** Routes only accessible by admins */
-export const ADMIN_ONLY_ROUTES = ["/admin-dashboard"];
+export const ADMIN_ONLY_ROUTES = ["/admin-dashboard", "/wellbeing"];
 
 /** Routes accessible by faculty AND admins (but not students) */
 export const FACULTY_ROUTES = ["/faculty-dashboard"];
@@ -10,7 +10,7 @@ export const FACULTY_ROUTES = ["/faculty-dashboard"];
 export const SHARED_ROUTES = [
     "/dashboard",
     "/report-incident",
-    "/well-being",
+    "/ai-assistant",
     "/consent-form",
     "/charts",
 ];

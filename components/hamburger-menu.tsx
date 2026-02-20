@@ -11,10 +11,11 @@ import type { UserRole } from "@/lib/roles";
 
 const allNavItems = [
     { label: "Incident Reporting", href: "/report-incident", roles: ["student", "faculty", "admin"] as UserRole[] },
-    { label: "Well-Being", href: "/well-being", roles: ["student", "faculty", "admin"] as UserRole[] },
+    { label: "AI Assistant", href: "/ai-assistant", roles: ["student", "faculty", "admin"] as UserRole[] },
     { label: "Dashboard", href: "/dashboard", roles: ["student"] as UserRole[] },
     { label: "Faculty Dashboard", href: "/faculty-dashboard", roles: ["faculty"] as UserRole[] },
     { label: "Admin Dashboard", href: "/admin-dashboard", roles: ["admin"] as UserRole[] },
+    { label: "Wellbeing Reports", href: "/wellbeing", roles: ["admin"] as UserRole[] },
     { label: "Consent Form", href: "/consent-form", roles: ["student", "faculty", "admin"] as UserRole[] },
 ];
 

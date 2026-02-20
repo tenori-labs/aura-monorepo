@@ -3,23 +3,33 @@
 import { ai } from '@/lib/ai/genkit';
 
 /**
- * Generate a neutral wellbeing report from conversation themes.
+ * Structured wellbeing report returned by the LLM.
+ */
+export interface StructuredReport {
+    summary: string;
+    riskLevel: 'low' | 'moderate' | 'high';
+    observedBehaviors: string[];
+    recommendedActions: string[];
+    contextNotes: string;
+    /** Legacy plain-text fallback (concatenated for backward compatibility) */
+    reportText: string;
+}
+
+/**
+ * Generate a structured wellbeing report from conversation themes.
  *
  * CRITICAL RULES enforced by the prompt:
  * - No names or identifying information
  * - No direct quotes from the student
  * - No clinical terms or diagnoses
  * - Neutral, observational language only
- * - 3-4 sentences maximum
  *
- * Input is themes[] + clarification summary — never raw chat messages.
- * This ensures the report generator never has access to PII.
+ * Returns a StructuredReport with distinct sections for clean UI rendering.
  */
 export async function generateNeutralReport(
     themes: string[],
     clarificationSummary: string
-): Promise<string> {
-    // Build a prompt that works even if themes are empty
+): Promise<StructuredReport> {
     const themesSection = themes.length > 0
         ? `Observed themes: ${themes.join(", ")}`
         : 'No specific themes were extracted automatically.';
@@ -27,39 +37,76 @@ export async function generateNeutralReport(
     try {
         const result = await ai.generate({
             model: 'googleai/gemini-2.0-flash-001',
-            prompt: `Generate a neutral, observational wellbeing report for a student support team. This will be read by an external counselor who must not form judgements about the student before meeting them.
+            prompt: `You are a wellbeing report generator for a university student support system. Generate a structured JSON report based on the following themes and context. This will be read by an administrator who needs clear, actionable information.
 
 Rules:
-- Do not include any names or identifying information
-- Do not diagnose or use clinical terms
-- Do not quote the student directly
+- Do NOT include any names or identifying information
+- Do NOT diagnose or use clinical terms (e.g., no "depression", "anxiety disorder")
+- Do NOT quote the student directly
 - Use neutral, observational language only
-- 3-4 sentences maximum
 - Avoid alarming language while still communicating the concern
-- If no specific themes are provided, use the context summary to write the report
 
 ${themesSection}
 Context: ${clarificationSummary}
 
-Example tone: "Student expressed language consistent with significant emotional distress. Themes of academic pressure and social isolation were observed. A supportive outreach conversation is recommended."
+Return ONLY a valid JSON object with NO markdown formatting, NO code fences, in this exact structure:
+{
+  "summary": "1-2 sentence high-level overview of the situation",
+  "riskLevel": "low" or "moderate" or "high",
+  "observedBehaviors": ["behavior 1", "behavior 2", "behavior 3"],
+  "recommendedActions": ["action 1", "action 2"],
+  "contextNotes": "Brief additional context from the conversation that may help the reviewer"
+}
 
-Generate the report now:`,
+Risk level guide:
+- "low": Student expressed general stress or frustration, no safety concerns
+- "moderate": Student expressed significant emotional distress, potential need for support
+- "high": Student expressed language suggesting self-harm risk or severe crisis
+
+Example:
+{
+  "summary": "Student expressed language consistent with significant emotional distress, with themes of academic pressure and social withdrawal.",
+  "riskLevel": "moderate",
+  "observedBehaviors": ["Expressed feelings of hopelessness about academic performance", "Mentioned withdrawing from social activities", "Indicated persistent low mood over several weeks"],
+  "recommendedActions": ["Schedule supportive outreach conversation within 48 hours", "Connect student with campus counseling services", "Monitor for follow-up engagement"],
+  "contextNotes": "Student clarified that recent academic setbacks have compounded feelings of isolation. No immediate safety concern expressed but ongoing support recommended."
+}
+
+Generate the JSON now:`,
         });
 
-        const reportText = result.text?.trim();
+        const raw = result.text?.trim() ?? '';
 
-        if (!reportText) {
-            // Even the fallback should use the clarification summary if available
-            return clarificationSummary
-                ? `Student was flagged for potential emotional distress. ${clarificationSummary} A supportive outreach conversation is recommended.`
-                : 'Student was flagged for potential emotional distress during a wellbeing conversation. A supportive outreach conversation is recommended.';
-        }
+        // Parse the JSON — strip any accidental markdown fences
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+        const parsed = JSON.parse(cleaned);
 
-        return reportText;
+        // Validate and normalize
+        const report: StructuredReport = {
+            summary: parsed.summary || 'Student was flagged for potential emotional distress.',
+            riskLevel: ['low', 'moderate', 'high'].includes(parsed.riskLevel) ? parsed.riskLevel : 'moderate',
+            observedBehaviors: Array.isArray(parsed.observedBehaviors) ? parsed.observedBehaviors : [],
+            recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Supportive outreach conversation recommended'],
+            contextNotes: parsed.contextNotes || '',
+            reportText: parsed.summary || 'Student was flagged for potential emotional distress during a wellbeing conversation.',
+        };
+
+        return report;
     } catch (e: any) {
-        console.error('Error generating neutral report:', e);
-        return clarificationSummary
-            ? `Student was flagged for potential emotional distress. ${clarificationSummary} Manual review and supportive outreach is recommended.`
-            : 'Student was flagged for potential emotional distress during a wellbeing conversation. Automatic report generation encountered an error. Manual review and supportive outreach is recommended.';
+        console.error('Error generating structured report:', e);
+
+        // Graceful fallback
+        return {
+            summary: clarificationSummary
+                ? `Student was flagged for potential emotional distress. ${clarificationSummary}`
+                : 'Student was flagged for potential emotional distress during a wellbeing conversation.',
+            riskLevel: 'moderate',
+            observedBehaviors: themes.length > 0 ? themes : ['Emotional distress indicators observed'],
+            recommendedActions: ['Manual review and supportive outreach is recommended'],
+            contextNotes: clarificationSummary || '',
+            reportText: clarificationSummary
+                ? `Student was flagged for potential emotional distress. ${clarificationSummary} Manual review and supportive outreach is recommended.`
+                : 'Student was flagged for potential emotional distress during a wellbeing conversation. Manual review and supportive outreach is recommended.',
+        };
     }
 }

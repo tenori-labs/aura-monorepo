@@ -98,6 +98,7 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
     const router = useRouter();
     const [selected, setSelected] = useState<IncidentReport | null>(null);
     const [showTimeline, setShowTimeline] = useState(false);
+    const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState<string>("all");
     const [newStatus, setNewStatus] = useState<string>("");
     const [notes, setNotes] = useState<string>("");
@@ -334,7 +335,38 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                                         <Separator size="4" my="3" />
                                         <Box>
                                             <Text size="1" color="gray" mb="1" style={{ display: "block" }}>Attachment</Text>
-                                            <Badge variant="soft" size="2">{selected.mediaFileName}</Badge>
+                                            {selected.mediaBase64 && selected.mediaType?.startsWith('image/') ? (
+                                                <Flex direction="column" gap="2">
+                                                    <Box
+                                                        onClick={() => setMediaPreviewOpen(true)}
+                                                        style={{
+                                                            cursor: "pointer",
+                                                            borderRadius: "var(--radius-3)",
+                                                            overflow: "hidden",
+                                                            border: "1px solid var(--gray-a4)",
+                                                            maxWidth: 200,
+                                                            transition: "box-shadow 0.15s ease",
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 0 2px var(--accent-7)"}
+                                                        onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
+                                                    >
+                                                        <img
+                                                            src={selected.mediaBase64}
+                                                            alt={selected.mediaFileName}
+                                                            style={{
+                                                                width: "100%",
+                                                                height: "auto",
+                                                                maxHeight: 140,
+                                                                objectFit: "cover",
+                                                                display: "block",
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                    <Text size="1" color="gray">{selected.mediaFileName} · Click to enlarge</Text>
+                                                </Flex>
+                                            ) : (
+                                                <Badge variant="soft" size="2">{selected.mediaFileName}</Badge>
+                                            )}
                                         </Box>
                                     </>
                                 )}
@@ -604,6 +636,41 @@ export function FacultyIncidentTable({ incidents, categoryAssignments, assignedC
                     ))
                 }
             </Flex >
+
+            {/* ─── Media Lightbox ─── */}
+            <Dialog.Root open={mediaPreviewOpen} onOpenChange={setMediaPreviewOpen}>
+                <Dialog.Content
+                    style={{
+                        width: "fit-content",
+                        maxWidth: "90vw",
+                        maxHeight: "90vh",
+                        padding: 0,
+                        overflow: "hidden",
+                        background: "var(--color-background)",
+                    }}
+                >
+                    {selected?.mediaBase64 && selected.mediaType?.startsWith('image/') && (
+                        <Flex direction="column" align="center" gap="3" p="4">
+                            <img
+                                src={selected.mediaBase64}
+                                alt={selected.mediaFileName || "Attachment"}
+                                style={{
+                                    maxWidth: "100%",
+                                    maxHeight: "75vh",
+                                    objectFit: "contain",
+                                    borderRadius: "var(--radius-3)",
+                                }}
+                            />
+                            <Flex justify="between" align="center" style={{ width: "100%" }}>
+                                <Text size="2" color="gray">{selected.mediaFileName}</Text>
+                                <Dialog.Close>
+                                    <Button variant="soft" color="gray" size="1">Close</Button>
+                                </Dialog.Close>
+                            </Flex>
+                        </Flex>
+                    )}
+                </Dialog.Content>
+            </Dialog.Root>
         </>
     );
 }

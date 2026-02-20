@@ -51,9 +51,9 @@ export function PageFooter() {
                             Report
                         </Text>
                     </Link>
-                    <Link href="/well-being" style={{ textDecoration: "none" }}>
+                    <Link href="/ai-assistant" style={{ textDecoration: "none" }}>
                         <Text size="1" color="gray" style={{ cursor: "pointer" }}>
-                            Well-Being
+                            AI Assistant
                         </Text>
                     </Link>
                 </Flex>

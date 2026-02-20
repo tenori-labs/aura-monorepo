@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { PageFooter } from "@/components/page-footer";
 import { AuraChat } from "@/components/aura-chat";
 
-export default async function WellBeingPage() {
+export default async function AIAssistantPage() {
     const supabase = await createClient();
 
     const {
@@ -33,7 +33,7 @@ export default async function WellBeingPage() {
             }}
         >
             <PageHeader
-                title="Well-Being"
+                title="AI Assistant"
                 subtitle="Talk to Aura, your AI mental health companion"
             />
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
     Badge,
     Box,
@@ -19,19 +20,25 @@ import {
     Share1Icon,
     CheckCircledIcon,
 } from "@radix-ui/react-icons";
-import { revealIdentity, updateReportStatus, generateCounselorReport } from "@/app/faculty-dashboard/wellbeing-actions";
+import { revealIdentity, updateReportStatus, generateCounselorReport } from "@/app/wellbeing/wellbeing-actions";
 
 // Type matching the Prisma WellbeingReport model (plus accessCount)
 interface WellbeingReport {
     id: string;
     caseId: string;
     uid: string;
-    studentName?: string; // Optional because it's stripped by default
+    studentName?: string;
     generatedAt: Date;
     reportText: string;
     themes: string[];
     status: string;
     accessCount: number;
+    // ─── Structured fields ───
+    riskLevel?: string;
+    summary?: string;
+    observedBehaviors?: string[];
+    recommendedActions?: string[];
+    contextNotes?: string;
 }
 
 interface Props {
@@ -48,6 +55,24 @@ const getStatusColor = (status: string) => {
     }
 };
 
+const getRiskColor = (risk?: string) => {
+    switch (risk) {
+        case "low": return "green" as const;
+        case "moderate": return "orange" as const;
+        case "high": return "red" as const;
+        default: return "gray" as const;
+    }
+};
+
+const getRiskIcon = (risk?: string) => {
+    switch (risk) {
+        case "low": return "●";
+        case "moderate": return "▲";
+        case "high": return "⬤";
+        default: return "○";
+    }
+};
+
 const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString("en-IN", {
         month: "short",
@@ -57,13 +82,13 @@ const formatDate = (date: Date) => {
 };
 
 export function WellbeingReportTable({ reports }: Props) {
+    const router = useRouter();
     const [selected, setSelected] = useState<WellbeingReport | null>(null);
     const [revealReason, setRevealReason] = useState("");
     const [isRevealing, setIsRevealing] = useState(false);
     const [revealedName, setRevealedName] = useState<string | null>(null);
     const [counselorSnapshot, setCounselorSnapshot] = useState<string | null>(null);
 
-    // Reset internal state when selection changes
     const onSelect = (report: WellbeingReport) => {
         setSelected(report);
         setRevealReason("");
@@ -103,8 +128,8 @@ export function WellbeingReportTable({ reports }: Props) {
         if (!selected) return;
         try {
             await updateReportStatus(selected.id, "reviewed");
-            alert("Status updated to Reviewed. Please refresh the page to see changes.");
-            // In a real app we'd optimistic update or router.refresh()
+            setSelected({ ...selected, status: "reviewed" });
+            router.refresh();
         } catch (error) {
             console.error("Failed to update status:", error);
         }
@@ -117,6 +142,9 @@ export function WellbeingReportTable({ reports }: Props) {
         }
     };
 
+    // Check if a report has structured data
+    const hasStructuredData = (r: WellbeingReport) => !!r.summary || !!r.riskLevel;
+
     return (
         <>
             <Card size="2" style={{ overflow: "hidden" }}>
@@ -126,6 +154,7 @@ export function WellbeingReportTable({ reports }: Props) {
                             <Table.Row>
                                 <Table.ColumnHeaderCell>Case ID</Table.ColumnHeaderCell>
                                 <Table.ColumnHeaderCell>Date</Table.ColumnHeaderCell>
+                                <Table.ColumnHeaderCell>Risk</Table.ColumnHeaderCell>
                                 <Table.ColumnHeaderCell>Themes</Table.ColumnHeaderCell>
                                 <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
                                 <Table.ColumnHeaderCell>Identity Access</Table.ColumnHeaderCell>
@@ -147,6 +176,15 @@ export function WellbeingReportTable({ reports }: Props) {
                                     </Table.Cell>
                                     <Table.Cell>
                                         <Text size="2">{formatDate(report.generatedAt)}</Text>
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                        {report.riskLevel ? (
+                                            <Badge color={getRiskColor(report.riskLevel)} size="1" variant="solid" style={{ textTransform: "capitalize" }}>
+                                                {getRiskIcon(report.riskLevel)} {report.riskLevel}
+                                            </Badge>
+                                        ) : (
+                                            <Text size="1" color="gray">—</Text>
+                                        )}
                                     </Table.Cell>
                                     <Table.Cell>
                                         <Flex gap="1" wrap="wrap">
@@ -184,23 +222,114 @@ export function WellbeingReportTable({ reports }: Props) {
 
             {/* ─── Detail Dialog ─── */}
             <Dialog.Root open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
-                <Dialog.Content style={{ maxWidth: 600, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+                <Dialog.Content style={{ maxWidth: 620, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0 }}>
                     {selected && (
                         <>
-                            <Dialog.Title mb="2">
-                                Wellbeing Report: <Text style={{ fontFamily: "monospace" }}>{selected.caseId}</Text>
-                            </Dialog.Title>
-
-                            <Box style={{ flex: 1, overflowY: "auto", paddingRight: 10 }}>
-                                <Flex justify="between" align="center" mb="4">
-                                    <Badge color={getStatusColor(selected.status)} size="3" variant="soft">
-                                        {selected.status}
-                                    </Badge>
+                            {/* ─── Header ─── */}
+                            <Box px="5" pt="5" pb="3">
+                                <Dialog.Title mb="1">
+                                    Wellbeing Report: <Text style={{ fontFamily: "monospace" }}>{selected.caseId}</Text>
+                                </Dialog.Title>
+                                <Flex justify="between" align="center" mt="2">
+                                    <Flex gap="2" align="center">
+                                        <Badge color={getStatusColor(selected.status)} size="2" variant="soft" style={{ textTransform: "capitalize" }}>
+                                            {selected.status}
+                                        </Badge>
+                                        {selected.riskLevel && (
+                                            <Badge color={getRiskColor(selected.riskLevel)} size="2" variant="solid" style={{ textTransform: "capitalize" }}>
+                                                {getRiskIcon(selected.riskLevel)} {selected.riskLevel} Risk
+                                            </Badge>
+                                        )}
+                                    </Flex>
                                     <Text size="2" color="gray">{formatDate(selected.generatedAt)}</Text>
                                 </Flex>
+                            </Box>
 
+                            {/* ─── Scrollable Body ─── */}
+                            <Box px="5" pb="4" style={{ flex: 1, overflowY: "auto" }}>
+
+                                {/* ─── Summary ─── */}
+                                {selected.summary && (
+                                    <Card
+                                        size="2"
+                                        mb="4"
+                                        style={{
+                                            background: selected.riskLevel === "high"
+                                                ? "var(--red-a2)"
+                                                : selected.riskLevel === "moderate"
+                                                    ? "var(--orange-a2)"
+                                                    : "var(--green-a2)",
+                                            border: `1px solid ${selected.riskLevel === "high"
+                                                ? "var(--red-a4)"
+                                                : selected.riskLevel === "moderate"
+                                                    ? "var(--orange-a4)"
+                                                    : "var(--green-a4)"
+                                                }`,
+                                        }}
+                                    >
+                                        <Text size="2" style={{ lineHeight: 1.6 }}>
+                                            {selected.summary}
+                                        </Text>
+                                    </Card>
+                                )}
+
+                                {/* ─── Observed Behaviors ─── */}
+                                {selected.observedBehaviors && selected.observedBehaviors.length > 0 && (
+                                    <Box mb="4">
+                                        <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>
+                                            Observed Behaviors
+                                        </Text>
+                                        <Card variant="surface" size="1">
+                                            <Flex direction="column" gap="2" py="1">
+                                                {selected.observedBehaviors.map((b, i) => (
+                                                    <Flex key={i} gap="2" align="start">
+                                                        <Text size="2" color="gray" style={{ flexShrink: 0, marginTop: 2 }}>•</Text>
+                                                        <Text size="2" style={{ lineHeight: 1.5 }}>{b}</Text>
+                                                    </Flex>
+                                                ))}
+                                            </Flex>
+                                        </Card>
+                                    </Box>
+                                )}
+
+                                {/* ─── Recommended Actions ─── */}
+                                {selected.recommendedActions && selected.recommendedActions.length > 0 && (
+                                    <Box mb="4">
+                                        <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>
+                                            Recommended Actions
+                                        </Text>
+                                        <Flex direction="column" gap="2">
+                                            {selected.recommendedActions.map((a, i) => (
+                                                <Card key={i} variant="surface" size="1">
+                                                    <Flex gap="2" align="start">
+                                                        <Badge color="blue" variant="solid" size="1" style={{ flexShrink: 0, marginTop: 2 }}>
+                                                            {i + 1}
+                                                        </Badge>
+                                                        <Text size="2" style={{ lineHeight: 1.5 }}>{a}</Text>
+                                                    </Flex>
+                                                </Card>
+                                            ))}
+                                        </Flex>
+                                    </Box>
+                                )}
+
+                                {/* ─── Context Notes ─── */}
+                                {selected.contextNotes && (
+                                    <Box mb="4">
+                                        <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>
+                                            Context Notes
+                                        </Text>
+                                        <Box p="3" style={{ background: "var(--gray-a2)", borderRadius: "var(--radius-3)" }}>
+                                            <Text size="2" color="gray" style={{ lineHeight: 1.6 }}>
+                                                {selected.contextNotes}
+                                            </Text>
+                                        </Box>
+                                    </Box>
+                                )}
+
+                                {/* ─── Themes ─── */}
                                 <Box mb="4">
-                                    <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>Observed Themes</Text>
+                                    <Text size="2" weight="bold" mb="2" style={{ display: "block" }}>Themes</Text>
                                     <Flex gap="2" wrap="wrap">
                                         {selected.themes.map(t => (
                                             <Badge key={t} size="2" variant="surface" color="gray">{t}</Badge>
@@ -208,11 +337,14 @@ export function WellbeingReportTable({ reports }: Props) {
                                     </Flex>
                                 </Box>
 
-                                <Box mb="4" p="3" style={{ background: "var(--gray-a3)", borderRadius: "var(--radius-3)" }}>
-                                    <Text size="2" style={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                                        {selected.reportText}
-                                    </Text>
-                                </Box>
+                                {/* ─── Legacy Report Text (fallback for old reports) ─── */}
+                                {!hasStructuredData(selected) && (
+                                    <Box mb="4" p="3" style={{ background: "var(--gray-a3)", borderRadius: "var(--radius-3)" }}>
+                                        <Text size="2" style={{ lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                                            {selected.reportText}
+                                        </Text>
+                                    </Box>
+                                )}
 
                                 <Separator size="4" my="4" />
 
@@ -257,22 +389,107 @@ export function WellbeingReportTable({ reports }: Props) {
                                 </Box>
 
                                 {/* ─── Counselor Snapshot Section ─── */}
-                                {counselorSnapshot && (
+                                {counselorSnapshot && selected && (
                                     <Box mb="4">
                                         <Heading size="3" mb="2">Counselor Handover</Heading>
-                                        <TextArea
-                                            readOnly
-                                            value={counselorSnapshot}
-                                            style={{ height: 200, fontFamily: "monospace", fontSize: 13 }}
-                                        />
-                                        <Button mt="2" onClick={copyToClipboard} variant="outline">
-                                            Copy to Clipboard
-                                        </Button>
+                                        <Card
+                                            size="2"
+                                            style={{
+                                                background: "var(--gray-a2)",
+                                                border: "1px solid var(--gray-a4)",
+                                            }}
+                                        >
+                                            <Flex direction="column" gap="3">
+                                                {/* Header */}
+                                                <Flex justify="between" align="center" wrap="wrap" gap="2">
+                                                    <Text size="1" weight="bold" color="gray" style={{ letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                                                        Safeguarding Report
+                                                    </Text>
+                                                    {selected.riskLevel && (
+                                                        <Badge color={getRiskColor(selected.riskLevel)} size="1" variant="solid" style={{ textTransform: "capitalize" }}>
+                                                            {selected.riskLevel} Risk
+                                                        </Badge>
+                                                    )}
+                                                </Flex>
+
+                                                <Flex gap="4" wrap="wrap">
+                                                    <Text size="1" color="gray">Case: <Text weight="medium" style={{ fontFamily: "monospace" }}>{selected.caseId}</Text></Text>
+                                                    <Text size="1" color="gray">Date: <Text weight="medium">{formatDate(selected.generatedAt)}</Text></Text>
+                                                </Flex>
+
+                                                <Separator size="4" />
+
+                                                {/* Summary */}
+                                                {selected.summary && (
+                                                    <Box>
+                                                        <Text size="1" weight="bold" color="gray" mb="1" style={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>Summary</Text>
+                                                        <Text size="2" style={{ lineHeight: 1.6 }}>{selected.summary}</Text>
+                                                    </Box>
+                                                )}
+
+                                                {/* Observed Behaviors */}
+                                                {selected.observedBehaviors && selected.observedBehaviors.length > 0 && (
+                                                    <Box>
+                                                        <Text size="1" weight="bold" color="gray" mb="1" style={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>Observed Behaviors</Text>
+                                                        <Flex direction="column" gap="1">
+                                                            {selected.observedBehaviors.map((b, i) => (
+                                                                <Text key={i} size="2" style={{ lineHeight: 1.5 }}>• {b}</Text>
+                                                            ))}
+                                                        </Flex>
+                                                    </Box>
+                                                )}
+
+                                                {/* Themes */}
+                                                {selected.themes.length > 0 && (
+                                                    <Box>
+                                                        <Text size="1" weight="bold" color="gray" mb="1" style={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>Themes</Text>
+                                                        <Flex gap="2" wrap="wrap">
+                                                            {selected.themes.map(t => (
+                                                                <Badge key={t} size="1" variant="surface" color="gray">{t}</Badge>
+                                                            ))}
+                                                        </Flex>
+                                                    </Box>
+                                                )}
+
+                                                {/* Recommended Actions */}
+                                                {selected.recommendedActions && selected.recommendedActions.length > 0 && (
+                                                    <Box>
+                                                        <Text size="1" weight="bold" color="gray" mb="1" style={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>Recommended Actions</Text>
+                                                        <Flex direction="column" gap="1">
+                                                            {selected.recommendedActions.map((a, i) => (
+                                                                <Text key={i} size="2" style={{ lineHeight: 1.5 }}>{i + 1}. {a}</Text>
+                                                            ))}
+                                                        </Flex>
+                                                    </Box>
+                                                )}
+
+                                                {/* Context Notes */}
+                                                {selected.contextNotes && (
+                                                    <Box>
+                                                        <Text size="1" weight="bold" color="gray" mb="1" style={{ display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>Context</Text>
+                                                        <Text size="2" color="gray" style={{ lineHeight: 1.6 }}>{selected.contextNotes}</Text>
+                                                    </Box>
+                                                )}
+
+                                                <Separator size="4" />
+
+                                                {/* Footer note + Copy */}
+                                                <Flex justify="between" align="center" wrap="wrap" gap="2">
+                                                    <Text size="1" color="gray" style={{ fontStyle: "italic", maxWidth: 350 }}>
+                                                        No diagnostic claims are made. Use this context to guide initial outreach.
+                                                    </Text>
+                                                    <Button size="1" onClick={copyToClipboard} variant="soft" color="gray">
+                                                        Copy as Text
+                                                    </Button>
+                                                </Flex>
+                                            </Flex>
+                                        </Card>
                                     </Box>
                                 )}
                             </Box>
 
-                            <Flex gap="3" justify="end" mt="4" pt="4" style={{ borderTop: "1px solid var(--gray-a4)" }}>
+                            {/* ─── Footer ─── */}
+                            <Flex gap="3" justify="end" px="5" py="4" style={{ borderTop: "1px solid var(--gray-a4)" }}>
                                 <Dialog.Close>
                                     <Button variant="soft" color="gray">Close</Button>
                                 </Dialog.Close>

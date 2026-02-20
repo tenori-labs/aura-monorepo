@@ -70,16 +70,24 @@ model CategoryAssignment {
 /// `reportText` NEVER contains the student's name.
 /// `studentName` is stored separately, visible only to internal staff.
 model WellbeingReport {
-  id            String           @id @default(auto()) @map("_id") @db.ObjectId
-  caseId        String           @unique @default(cuid())
-  uid           String           // Supabase user ID
-  studentName   String           // internal only, never in reportText
-  generatedAt   DateTime         @default(now())
-  reportText    String           // neutral summary — no name inside
-  themes        String[]
-  status        String           @default("pending")
+  id                  String           @id @default(auto()) @map("_id") @db.ObjectId
+  caseId              String           @unique @default(cuid())
+  uid                 String           // Supabase user ID
+  studentName         String           // internal only, never in reportText
+  generatedAt         DateTime         @default(now())
+  reportText          String           // legacy plain-text fallback
+  themes              String[]
+  status              String           @default("pending")
   // status: "pending" | "reviewed" | "passed_on" | "closed"
-  accessLog     IdentityAccess[]
+
+  // ─── Structured report fields ───
+  riskLevel           String?          // "low" | "moderate" | "high"
+  summary             String?          // 1-2 sentence high-level summary
+  observedBehaviors   String[]         // e.g. ["expressed hopelessness"]
+  recommendedActions  String[]         // e.g. ["Schedule counselor outreach"]
+  contextNotes        String?          // additional context from clarification
+
+  accessLog           IdentityAccess[]
 }
 
 /// Audit log tracking who viewed a student's identity in a wellbeing report.

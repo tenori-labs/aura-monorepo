@@ -6,7 +6,7 @@ import {
     type MentalHealthChatInput,
     type ChatMessage,
 } from "@/lib/ai/flows/mental-health-chat-flow";
-import { handleClarification, generateAndStoreReport } from "@/app/well-being/actions";
+import { handleClarification, generateAndStoreReport } from "@/app/ai-assistant/actions";
 import {
     Avatar,
     Badge,

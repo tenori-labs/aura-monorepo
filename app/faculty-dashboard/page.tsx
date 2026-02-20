@@ -8,14 +8,11 @@ import {
     Heading,
     Separator,
     Text,
-    Tabs,
     Box,
 } from "@radix-ui/themes";
 import { PageHeader } from "@/components/page-header";
 import { PageFooter } from "@/components/page-footer";
 import { FacultyIncidentTable } from "@/components/faculty-incident-table";
-import { WellbeingReportTable } from "@/components/wellbeing-report-table";
-import { getWellbeingReports } from "@/app/faculty-dashboard/wellbeing-actions";
 import prisma from "@/lib/db";
 import { getUserRole, canAccessFacultyRoutes } from "@/lib/roles";
 
@@ -70,8 +67,7 @@ export default async function FacultyDashboardPage() {
         categoryAssignmentMap[a.category] = a.facultyEmail; // stores faculty name
     }
 
-    // Fetch Wellbeing Reports
-    const wellbeingReports = await getWellbeingReports();
+
 
     // Stats
     const totalReports = incidents.length;
@@ -185,90 +181,50 @@ export default async function FacultyDashboardPage() {
                     </Card>
                 </Flex>
 
-                {/* ─── Reports Tabs ─── */}
-                <Tabs.Root defaultValue="incidents">
-                    <Tabs.List>
-                        <Tabs.Trigger value="incidents">Incident Reports</Tabs.Trigger>
-                        <Tabs.Trigger value="wellbeing">Wellbeing Reports</Tabs.Trigger>
-                    </Tabs.List>
+                {/* ─── Incident Reports ─── */}
+                <Flex direction="column" gap="3">
+                    <Flex justify="between" align="center" wrap="wrap" gap="2">
+                        <Flex direction="column" gap="1">
+                            <Heading size={{ initial: "3", sm: "4" }}>Assigned Incidents</Heading>
+                            <Text size="2" color="gray">
+                                Click any report to view details and AI analysis.
+                            </Text>
+                        </Flex>
+                        <Badge variant="surface" size="2">
+                            {totalReports} {totalReports === 1 ? "report" : "reports"}
+                        </Badge>
+                    </Flex>
 
-                    <Box pt="3">
-                        <Tabs.Content value="incidents">
-                            <Flex direction="column" gap="3">
-                                <Flex justify="between" align="center" wrap="wrap" gap="2">
-                                    <Flex direction="column" gap="1">
-                                        <Heading size={{ initial: "3", sm: "4" }}>Assigned Incidents</Heading>
-                                        <Text size="2" color="gray">
-                                            Click any report to view details and AI analysis.
-                                        </Text>
-                                    </Flex>
-                                    <Badge variant="surface" size="2">
-                                        {totalReports} {totalReports === 1 ? "report" : "reports"}
-                                    </Badge>
-                                </Flex>
-
-                                {incidents.length === 0 ? (
-                                    <Card size="2">
-                                        <Flex direction="column" align="center" gap="2" py="5">
-                                            <Text size="3" color="gray" weight="medium">No reports yet</Text>
-                                            <Text size="2" color="gray">
-                                                Assigned incident reports will appear here.
-                                            </Text>
-                                        </Flex>
-                                    </Card>
-                                ) : (
-                                    <FacultyIncidentTable
-                                        incidents={JSON.parse(JSON.stringify(incidents))}
-                                        categoryAssignments={categoryAssignmentMap}
-                                        assignedCategories={
-                                            allAssignments
-                                                .filter((a: { facultyId: string }) => a.facultyId === user.id)
-                                                .map((a: { category: string }) => a.category)
-                                        }
-                                        allCategories={[
-                                            "Academic Integrity",
-                                            "Harassment/Bullying",
-                                            "Safety/Security",
-                                            "Medical Emergency",
-                                            "Facilities Issue",
-                                            "Other",
-                                        ]}
-                                        isAdmin={false}
-                                    />
-                                )}
+                    {incidents.length === 0 ? (
+                        <Card size="2">
+                            <Flex direction="column" align="center" gap="2" py="5">
+                                <Text size="3" color="gray" weight="medium">No reports yet</Text>
+                                <Text size="2" color="gray">
+                                    Assigned incident reports will appear here.
+                                </Text>
                             </Flex>
-                        </Tabs.Content>
-
-                        <Tabs.Content value="wellbeing">
-                            <Flex direction="column" gap="3">
-                                <Flex justify="between" align="center" wrap="wrap" gap="2">
-                                    <Flex direction="column" gap="1">
-                                        <Heading size={{ initial: "3", sm: "4" }}>Wellbeing Alerts</Heading>
-                                        <Text size="2" color="gray">
-                                            Confidential reports generated from Aura conversations.
-                                        </Text>
-                                    </Flex>
-                                    <Badge variant="surface" size="2">
-                                        {wellbeingReports.length} {wellbeingReports.length === 1 ? "report" : "reports"}
-                                    </Badge>
-                                </Flex>
-
-                                {wellbeingReports.length === 0 ? (
-                                    <Card size="2">
-                                        <Flex direction="column" align="center" gap="2" py="5">
-                                            <Text size="3" color="gray" weight="medium">No wellbeing alerts</Text>
-                                            <Text size="2" color="gray">
-                                                Flagged conversations will appear here.
-                                            </Text>
-                                        </Flex>
-                                    </Card>
-                                ) : (
-                                    <WellbeingReportTable reports={JSON.parse(JSON.stringify(wellbeingReports))} />
-                                )}
-                            </Flex>
-                        </Tabs.Content>
-                    </Box>
-                </Tabs.Root>
+                        </Card>
+                    ) : (
+                        <FacultyIncidentTable
+                            incidents={JSON.parse(JSON.stringify(incidents))}
+                            categoryAssignments={categoryAssignmentMap}
+                            assignedCategories={
+                                allAssignments
+                                    .filter((a: { facultyId: string }) => a.facultyId === user.id)
+                                    .map((a: { category: string }) => a.category)
+                            }
+                            allCategories={[
+                                "Academic Integrity",
+                                "Harassment/Bullying",
+                                "Safety/Security",
+                                "Medical Emergency",
+                                "Facilities Issue",
+                                "Other",
+                            ]}
+                            isAdmin={false}
+                        />
+                    )}
+                </Flex>
             </Flex >
 
             {/* ─── Responsive Styles ─── */}
