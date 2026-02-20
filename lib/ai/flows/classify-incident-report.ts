@@ -1,4 +1,3 @@
-
 import { ai } from '@/lib/ai/genkit';
 import { z } from 'genkit';
 
@@ -6,64 +5,54 @@ import { z } from 'genkit';
  * Input schema for classifying incident reports.
  */
 const ClassifyIncidentReportInputSchema = z.object({
-    reportText: z
-        .string()
-        .describe('The text content of the incident report.'),
-    media: z
-        .string()
-        .optional()
-        .describe(
-            "Optional media (image) attached to the report, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-        ),
+  reportText: z.string().describe('The text content of the incident report.'),
+  media: z
+    .string()
+    .optional()
+    .describe(
+      "Optional media (image) attached to the report, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
 });
 
 /**
  * Type definition for the input to the classifyIncidentReport function.
  */
-export type ClassifyIncidentReportInput = z.infer<
-    typeof ClassifyIncidentReportInputSchema
->;
+export type ClassifyIncidentReportInput = z.infer<typeof ClassifyIncidentReportInputSchema>;
 
 /**
  * Output schema for the classified incident report.
  */
 export const ClassifyIncidentReportOutputSchema = z.object({
-    category: z
-        .string()
-        .describe(
-            'The predicted category of the incident report (e.g., harassment, theft, vandalism).'
-        ),
-    confidence: z
-        .number()
-        .describe(
-            'A confidence score (0-1) indicating the certainty of the category assignment.'
-        ),
-    keywords: z
-        .array(z.string())
-        .describe('Keywords extracted from the incident report text and/or image.'),
-    validity: z
-        .enum(['Likely Valid', 'Needs Review', 'Invalid'])
-        .describe(
-            'Assessment of whether the report appears to be a genuine incident or spam/irrelevant.'
-        ),
-    validityReason: z
-        .string()
-        .describe('A brief explanation for the validity assessment.'),
+  category: z
+    .string()
+    .describe(
+      'The predicted category of the incident report (e.g., harassment, theft, vandalism).'
+    ),
+  confidence: z
+    .number()
+    .describe('A confidence score (0-1) indicating the certainty of the category assignment.'),
+  keywords: z
+    .array(z.string())
+    .describe('Keywords extracted from the incident report text and/or image.'),
+  validity: z
+    .enum(['Likely Valid', 'Needs Review', 'Invalid'])
+    .describe(
+      'Assessment of whether the report appears to be a genuine incident or spam/irrelevant.'
+    ),
+  validityReason: z.string().describe('A brief explanation for the validity assessment.'),
 });
 
 /**
  * Type definition for the output of the classifyIncidentReport function.
  */
-export type ClassifyIncidentReportOutput = z.infer<
-    typeof ClassifyIncidentReportOutputSchema
->;
+export type ClassifyIncidentReportOutput = z.infer<typeof ClassifyIncidentReportOutputSchema>;
 
 // Define the Prompt
 const classifyIncidentReportPrompt = ai.definePrompt({
-    name: 'classifyIncidentReportPrompt',
-    input: { schema: ClassifyIncidentReportInputSchema },
-    output: { schema: ClassifyIncidentReportOutputSchema },
-    prompt: `You are an AI assistant that classifies incident reports based on their text content and an optional attached image.
+  name: 'classifyIncidentReportPrompt',
+  input: { schema: ClassifyIncidentReportInputSchema },
+  output: { schema: ClassifyIncidentReportOutputSchema },
+  prompt: `You are an AI assistant that classifies incident reports based on their text content and an optional attached image.
 
   Analyze the following incident report. determine:
   1. The most appropriate category.
@@ -88,30 +77,35 @@ const classifyIncidentReportPrompt = ai.definePrompt({
 
 // Define the Flow
 export const classifyIncidentReport = ai.defineFlow(
-    {
-        name: 'classifyIncidentReport',
-        inputSchema: ClassifyIncidentReportInputSchema,
-        outputSchema: ClassifyIncidentReportOutputSchema,
-    },
-    async (input) => {
-        // --- PII Filter: sanitize before sending to LLM ---
-        const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
-        const [sanitizedText, sessionId] = filterPII(input.reportText);
+  {
+    name: 'classifyIncidentReport',
+    inputSchema: ClassifyIncidentReportInputSchema,
+    outputSchema: ClassifyIncidentReportOutputSchema,
+  },
+  async (input) => {
+    // --- PII Filter: sanitize before sending to LLM ---
+    const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
+    const [sanitizedText, sessionId] = filterPII(input.reportText);
 
-        console.log('[PII Filter] Original length:', input.reportText.length, '→ Sanitized:', sanitizedText.length);
+    console.log(
+      '[PII Filter] Original length:',
+      input.reportText.length,
+      '→ Sanitized:',
+      sanitizedText.length
+    );
 
-        const { output } = await classifyIncidentReportPrompt({
-            ...input,
-            reportText: sanitizedText, // Send sanitized text to Gemini
-        });
+    const { output } = await classifyIncidentReportPrompt({
+      ...input,
+      reportText: sanitizedText, // Send sanitized text to Gemini
+    });
 
-        // --- PII Filter: reconstruct PII in keywords ---
-        const result = {
-            ...output!,
-            keywords: output!.keywords.map((kw: string) => reconstructPII(sessionId, kw)),
-        };
+    // --- PII Filter: reconstruct PII in keywords ---
+    const result = {
+      ...output!,
+      keywords: output!.keywords.map((kw: string) => reconstructPII(sessionId, kw)),
+    };
 
-        clearPIISession(sessionId);
-        return result;
-    }
+    clearPIISession(sessionId);
+    return result;
+  }
 );

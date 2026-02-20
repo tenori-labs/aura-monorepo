@@ -1,24 +1,37 @@
-
 // src/app/login/faculty/page.tsx
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Loader2 } from "lucide-react";
+import { useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Briefcase, Loader2 } from 'lucide-react';
 
 const facultyLoginFormSchema = z.object({
-  facultyId: z.string().min(1, "Faculty ID is required."),
-  password: z.string().min(1, "Password is required."),
+  facultyId: z.string().min(1, 'Faculty ID is required.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 type FacultyLoginFormValues = z.infer<typeof facultyLoginFormSchema>;
@@ -31,33 +44,33 @@ export default function FacultyLoginPage() {
   const form = useForm<FacultyLoginFormValues>({
     resolver: zodResolver(facultyLoginFormSchema),
     defaultValues: {
-      facultyId: "faculty01",
-      password: "pass123",
+      facultyId: 'faculty01',
+      password: 'pass123',
     },
   });
 
   async function onSubmit(data: FacultyLoginFormValues) {
     setIsLoading(true);
-    console.log("Faculty login attempt:", data);
+    console.log('Faculty login attempt:', data);
     // Simulate API call for login
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Simulate successful faculty login
-    if (data.facultyId.toLowerCase() === "faculty01" && data.password === "pass123") {
+    if (data.facultyId.toLowerCase() === 'faculty01' && data.password === 'pass123') {
       toast({
-        title: "Faculty Login Successful",
-        description: "Redirecting to your Portal...",
+        title: 'Faculty Login Successful',
+        description: 'Redirecting to your Portal...',
       });
-      router.push("/faculty/profile"); // Redirect to faculty profile page
+      router.push('/faculty/profile'); // Redirect to faculty profile page
     } else {
       toast({
-        title: "Faculty Login Failed",
-        description: "Invalid Faculty ID or Password.",
-        variant: "destructive",
+        title: 'Faculty Login Failed',
+        description: 'Invalid Faculty ID or Password.',
+        variant: 'destructive',
       });
       setIsLoading(false);
     }
-     // No setIsLoading(false) here if successful, as redirect will occur
+    // No setIsLoading(false) here if successful, as redirect will occur
   }
 
   return (
@@ -102,7 +115,7 @@ export default function FacultyLoginPage() {
                 />
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoading ? "Logging in..." : "Login as Faculty"}
+                  {isLoading ? 'Logging in...' : 'Login as Faculty'}
                 </Button>
               </form>
             </Form>

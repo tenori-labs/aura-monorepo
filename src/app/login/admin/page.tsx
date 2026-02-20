@@ -1,24 +1,37 @@
-
 // src/app/login/admin/page.tsx
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { ShieldCheck, Loader2 } from 'lucide-react';
 
 const adminLoginFormSchema = z.object({
-  adminId: z.string().min(1, "Admin ID is required."),
-  password: z.string().min(1, "Password is required."),
+  adminId: z.string().min(1, 'Admin ID is required.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 type AdminLoginFormValues = z.infer<typeof adminLoginFormSchema>;
@@ -31,33 +44,33 @@ export default function AdminLoginPage() {
   const form = useForm<AdminLoginFormValues>({
     resolver: zodResolver(adminLoginFormSchema),
     defaultValues: {
-      adminId: "admin",
-      password: "password",
+      adminId: 'admin',
+      password: 'password',
     },
   });
 
   async function onSubmit(data: AdminLoginFormValues) {
     setIsLoading(true);
-    console.log("Admin login attempt:", data);
+    console.log('Admin login attempt:', data);
     // Simulate API call for login
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Simulate successful admin login
-    if (data.adminId.toLowerCase() === "admin" && data.password === "password") {
+    if (data.adminId.toLowerCase() === 'admin' && data.password === 'password') {
       toast({
-        title: "Admin Login Successful",
-        description: "Redirecting to Admin Portal...",
+        title: 'Admin Login Successful',
+        description: 'Redirecting to Admin Portal...',
       });
-      router.push("/admin"); // Redirect to admin dashboard
+      router.push('/admin'); // Redirect to admin dashboard
     } else {
       toast({
-        title: "Admin Login Failed",
-        description: "Invalid Admin ID or Password.",
-        variant: "destructive",
+        title: 'Admin Login Failed',
+        description: 'Invalid Admin ID or Password.',
+        variant: 'destructive',
       });
       setIsLoading(false);
     }
-     // No setIsLoading(false) here if successful, as redirect will occur
+    // No setIsLoading(false) here if successful, as redirect will occur
   }
 
   return (
@@ -102,7 +115,7 @@ export default function AdminLoginPage() {
                 />
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoading ? "Logging in..." : "Login as Admin"}
+                  {isLoading ? 'Logging in...' : 'Login as Admin'}
                 </Button>
               </form>
             </Form>

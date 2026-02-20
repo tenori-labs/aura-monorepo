@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next';
 
 // RootLayout (src/app/layout.tsx) already handles global styles, fonts, and Toaster.
@@ -21,9 +20,5 @@ export default function LoginLayout({
   // If a completely separate layout (e.g., no sidebar) is desired for login pages,
   // Next.js Route Groups would be the standard solution.
   // This change fixes the immediate hydration error.
-  return (
-    <>
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

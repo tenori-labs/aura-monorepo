@@ -1,48 +1,61 @@
-
 // src/app/login/page.tsx
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Label } from "@/components/ui/label"; 
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogIn, Loader2 } from "lucide-react";
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LogIn, Loader2 } from 'lucide-react';
 
 const loginFormSchema = z.object({
-  collegeId: z.string().min(1, "College ID is required."),
-  password: z.string().min(1, "Password is required."),
+  collegeId: z.string().min(1, 'College ID is required.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 // Dummy prefilled values
-const PREFILLED_COLLEGE_ID = "student";
-const PREFILLED_PASSWORD = "password";
-const PREFILLED_MOBILE = "1234567890";
+const PREFILLED_COLLEGE_ID = 'student';
+const PREFILLED_PASSWORD = 'password';
+const PREFILLED_MOBILE = '1234567890';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("email"); 
+  const [activeTab, setActiveTab] = useState('email');
   const [mobileNumber, setMobileNumber] = useState(PREFILLED_MOBILE);
-  const [redirectUrl, setRedirectUrl] = useState("/dashboard");
+  const [redirectUrl, setRedirectUrl] = useState('/dashboard');
 
   useEffect(() => {
     const redirectQuery = searchParams.get('redirect');
     if (redirectQuery) {
-      if (redirectQuery.startsWith("/")) {
+      if (redirectQuery.startsWith('/')) {
         setRedirectUrl(redirectQuery);
       }
     }
@@ -56,20 +69,23 @@ export default function LoginPage() {
     },
   });
 
-  async function handleLogin(data?: LoginFormValues) { 
+  async function handleLogin(data?: LoginFormValues) {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     let loginSuccess = false;
 
-    if (activeTab === "email") {
-      const emailFormData = data || form.getValues(); 
-      console.log("User login attempt (Email/ID):", emailFormData);
-      if (emailFormData.collegeId.toLowerCase() === PREFILLED_COLLEGE_ID.toLowerCase() && emailFormData.password === PREFILLED_PASSWORD) {
+    if (activeTab === 'email') {
+      const emailFormData = data || form.getValues();
+      console.log('User login attempt (Email/ID):', emailFormData);
+      if (
+        emailFormData.collegeId.toLowerCase() === PREFILLED_COLLEGE_ID.toLowerCase() &&
+        emailFormData.password === PREFILLED_PASSWORD
+      ) {
         loginSuccess = true;
       }
-    } else if (activeTab === "mobile") {
-      console.log("User login attempt (Mobile):", mobileNumber);
+    } else if (activeTab === 'mobile') {
+      console.log('User login attempt (Mobile):', mobileNumber);
       if (mobileNumber === PREFILLED_MOBILE) {
         loginSuccess = true;
       }
@@ -77,15 +93,15 @@ export default function LoginPage() {
 
     if (loginSuccess) {
       toast({
-        title: "Login Successful",
-        description: `Welcome back! Redirecting to ${redirectUrl === "/dashboard" ? "your dashboard" : "the requested page"}...`,
+        title: 'Login Successful',
+        description: `Welcome back! Redirecting to ${redirectUrl === '/dashboard' ? 'your dashboard' : 'the requested page'}...`,
       });
       router.push(redirectUrl);
     } else {
       toast({
-        title: "Login Failed",
-        description: "Invalid credentials. Please check your input.",
-        variant: "destructive",
+        title: 'Login Failed',
+        description: 'Invalid credentials. Please check your input.',
+        variant: 'destructive',
       });
       setIsLoading(false);
     }
@@ -93,11 +109,11 @@ export default function LoginPage() {
 
   async function handleGoogleLogin() {
     setIsLoading(true);
-    console.log("User login attempt (Google)");
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('User login attempt (Google)');
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     toast({
-      title: "Login Successful (Simulated)",
-      description: `Redirecting to ${redirectUrl === "/dashboard" ? "your dashboard" : "the requested page"} via Google Sign-In...`,
+      title: 'Login Successful (Simulated)',
+      description: `Redirecting to ${redirectUrl === '/dashboard' ? 'your dashboard' : 'the requested page'} via Google Sign-In...`,
     });
     router.push(redirectUrl);
   }
@@ -150,13 +166,19 @@ export default function LoginPage() {
                     />
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      {isLoading ? "Logging in..." : "Login with Email/ID"}
+                      {isLoading ? 'Logging in...' : 'Login with Email/ID'}
                     </Button>
                   </form>
                 </Form>
               </TabsContent>
               <TabsContent value="mobile">
-                <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-6 pt-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleLogin();
+                  }}
+                  className="space-y-6 pt-4"
+                >
                   <div className="space-y-2">
                     <Label htmlFor="mobileNumberInput">Mobile Number</Label>
                     <Input
@@ -169,7 +191,7 @@ export default function LoginPage() {
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isLoading ? "Logging in..." : "Login with Mobile"}
+                    {isLoading ? 'Logging in...' : 'Login with Mobile'}
                   </Button>
                 </form>
               </TabsContent>
@@ -180,21 +202,31 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
 
-            <Button variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4"><path fill="currentColor" d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.08-2.58 1.98-4.78 1.98-3.66 0-6.71-3.04-6.71-6.71s3.05-6.71 6.71-6.71c1.94 0 3.42.76 4.56 1.85l2.62-2.55C19.21 3.43 17.17 2.4 14.96 2.4c-4.97 0-9.01 4.04-9.01 9.01s4.04 9.01 9.01 9.01c3.04 0 5.36-1.02 7.18-2.82 1.9-1.86 2.73-4.49 2.73-7.39 0-.75-.08-1.25-.16-1.74H12.48z"></path></svg>}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4">
+                  <path
+                    fill="currentColor"
+                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.08-2.58 1.98-4.78 1.98-3.66 0-6.71-3.04-6.71-6.71s3.05-6.71 6.71-6.71c1.94 0 3.42.76 4.56 1.85l2.62-2.55C19.21 3.43 17.17 2.4 14.96 2.4c-4.97 0-9.01 4.04-9.01 9.01s4.04 9.01 9.01 9.01c3.04 0 5.36-1.02 7.18-2.82 1.9-1.86 2.73-4.49 2.73-7.39 0-.75-.08-1.25-.16-1.74H12.48z"
+                  ></path>
+                </svg>
+              )}
               Sign in with Google
             </Button>
           </CardContent>
           <CardFooter className="flex flex-col items-center space-y-3 pt-6 text-sm">
-            <p>
-              Staff or Portal Access?
-            </p>
+            <p>Staff or Portal Access?</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-center">
               <Link href="/login/faculty" className="font-medium text-primary hover:underline">
                 Faculty Login

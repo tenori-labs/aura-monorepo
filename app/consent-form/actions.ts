@@ -1,50 +1,58 @@
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import prisma from "@/lib/db";
-import { headers } from "next/headers";
+import { revalidatePath } from 'next/cache';
+import { createClient } from '@/lib/supabase/server';
+import prisma from '@/lib/db';
+import { headers } from 'next/headers';
+import { isSignatureValid } from './consent-validation';
 
+/**
+ * Process the submission of the UGC anti-ragging consent form.
+ * Validates the student signature, captures request metadata (IP, User Agent), and records it in MongoDB.
+ *
+ * @param formData - The form data containing student details such as `signature`, `fullName`, `studentId`, and `course`.
+ */
 export async function submitConsent(formData: FormData) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!user) {
-        throw new Error("Unauthorized");
-    }
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
 
-    const signature = formData.get("signature") as string;
-    const fullName = formData.get("fullName") as string;
-    const studentId = formData.get("studentId") as string;
-    const course = formData.get("course") as string;
+  const signature = formData.get('signature') as string;
+  const fullName = formData.get('fullName') as string;
+  const studentId = formData.get('studentId') as string;
+  const course = formData.get('course') as string;
 
-    // Server-side validation
-    if (signature.trim() !== fullName.trim()) {
-        // In a real app we might return form errors, but for simplicity we'll just throw/redirect
-        throw new Error("Signature mismatch");
-    }
+  // Server-side validation
+  if (!isSignatureValid(signature, fullName)) {
+    // In a real app we might return form errors, but for simplicity we'll just throw/redirect
+    throw new Error('Signature mismatch');
+  }
 
-    // Capture metadata
-    const headersList = await headers();
-    const ip = headersList.get("x-forwarded-for") || "unknown";
-    const userAgent = headersList.get("user-agent") || "unknown";
+  // Capture metadata
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for') || 'unknown';
+  const userAgent = headersList.get('user-agent') || 'unknown';
 
-    // Save to MongoDB
-    await prisma.consentRecord.create({
-        data: {
-            userId: user.id,
-            userEmail: user.email!,
-            fullName: fullName,
-            studentId: studentId || null,
-            course: course || null,
-            section: null, // Can be added later
-            ipAddress: ip,
-            userAgent: userAgent,
-            signedAt: new Date(),
-            consentVersion: "UGC-2009-v1"
-        }
-    });
+  // Save to MongoDB
+  await prisma.consentRecord.create({
+    data: {
+      userId: user.id,
+      userEmail: user.email!,
+      fullName: fullName,
+      studentId: studentId || null,
+      course: course || null,
+      section: null, // Can be added later
+      ipAddress: ip,
+      userAgent: userAgent,
+      signedAt: new Date(),
+      consentVersion: 'UGC-2009-v1',
+    },
+  });
 
-    revalidatePath("/consent-form");
+  revalidatePath('/consent-form');
 }

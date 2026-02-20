@@ -6,38 +6,36 @@ import { ai } from '@/lib/ai/genkit';
  * Structured wellbeing report returned by the LLM.
  */
 export interface StructuredReport {
-    summary: string;
-    riskLevel: 'low' | 'moderate' | 'high';
-    observedBehaviors: string[];
-    recommendedActions: string[];
-    contextNotes: string;
-    /** Legacy plain-text fallback (concatenated for backward compatibility) */
-    reportText: string;
+  summary: string;
+  riskLevel: 'low' | 'moderate' | 'high';
+  observedBehaviors: string[];
+  recommendedActions: string[];
+  contextNotes: string;
+  /** Legacy plain-text fallback (concatenated for backward compatibility) */
+  reportText: string;
 }
 
 /**
- * Generate a structured wellbeing report from conversation themes.
+ * Generates a structured wellbeing report from conversation themes using Google Gemini AI.
+ * Enforces strict prompt rules to guarantee no names, no identifiable quotes, and neutral observational language.
  *
- * CRITICAL RULES enforced by the prompt:
- * - No names or identifying information
- * - No direct quotes from the student
- * - No clinical terms or diagnoses
- * - Neutral, observational language only
- *
- * Returns a StructuredReport with distinct sections for clean UI rendering.
+ * @param themes - Array of extracted conversational themes from the dialogue
+ * @param clarificationSummary - Summary of distress context provided by the student
+ * @returns A StructuredReport containing the risk level, actions, and safety-verified generated fallback string
  */
 export async function generateNeutralReport(
-    themes: string[],
-    clarificationSummary: string
+  themes: string[],
+  clarificationSummary: string
 ): Promise<StructuredReport> {
-    const themesSection = themes.length > 0
-        ? `Observed themes: ${themes.join(", ")}`
-        : 'No specific themes were extracted automatically.';
+  const themesSection =
+    themes.length > 0
+      ? `Observed themes: ${themes.join(', ')}`
+      : 'No specific themes were extracted automatically.';
 
-    try {
-        const result = await ai.generate({
-            model: 'googleai/gemini-2.0-flash-001',
-            prompt: `You are a wellbeing report generator for a university student support system. Generate a structured JSON report based on the following themes and context. This will be read by an administrator who needs clear, actionable information.
+  try {
+    const result = await ai.generate({
+      model: 'googleai/gemini-2.0-flash-001',
+      prompt: `You are a wellbeing report generator for a university student support system. Generate a structured JSON report based on the following themes and context. This will be read by an administrator who needs clear, actionable information.
 
 Rules:
 - Do NOT include any names or identifying information
@@ -73,40 +71,49 @@ Example:
 }
 
 Generate the JSON now:`,
-        });
+    });
 
-        const raw = result.text?.trim() ?? '';
+    const raw = result.text?.trim() ?? '';
 
-        // Parse the JSON — strip any accidental markdown fences
-        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-        const parsed = JSON.parse(cleaned);
+    // Parse the JSON — strip any accidental markdown fences
+    const cleaned = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim();
+    const parsed = JSON.parse(cleaned);
 
-        // Validate and normalize
-        const report: StructuredReport = {
-            summary: parsed.summary || 'Student was flagged for potential emotional distress.',
-            riskLevel: ['low', 'moderate', 'high'].includes(parsed.riskLevel) ? parsed.riskLevel : 'moderate',
-            observedBehaviors: Array.isArray(parsed.observedBehaviors) ? parsed.observedBehaviors : [],
-            recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : ['Supportive outreach conversation recommended'],
-            contextNotes: parsed.contextNotes || '',
-            reportText: parsed.summary || 'Student was flagged for potential emotional distress during a wellbeing conversation.',
-        };
+    // Validate and normalize
+    const report: StructuredReport = {
+      summary: parsed.summary || 'Student was flagged for potential emotional distress.',
+      riskLevel: ['low', 'moderate', 'high'].includes(parsed.riskLevel)
+        ? parsed.riskLevel
+        : 'moderate',
+      observedBehaviors: Array.isArray(parsed.observedBehaviors) ? parsed.observedBehaviors : [],
+      recommendedActions: Array.isArray(parsed.recommendedActions)
+        ? parsed.recommendedActions
+        : ['Supportive outreach conversation recommended'],
+      contextNotes: parsed.contextNotes || '',
+      reportText:
+        parsed.summary ||
+        'Student was flagged for potential emotional distress during a wellbeing conversation.',
+    };
 
-        return report;
-    } catch (e: any) {
-        console.error('Error generating structured report:', e);
+    return report;
+  } catch (e: unknown) {
+    console.error('Error generating structured report:', e);
 
-        // Graceful fallback
-        return {
-            summary: clarificationSummary
-                ? `Student was flagged for potential emotional distress. ${clarificationSummary}`
-                : 'Student was flagged for potential emotional distress during a wellbeing conversation.',
-            riskLevel: 'moderate',
-            observedBehaviors: themes.length > 0 ? themes : ['Emotional distress indicators observed'],
-            recommendedActions: ['Manual review and supportive outreach is recommended'],
-            contextNotes: clarificationSummary || '',
-            reportText: clarificationSummary
-                ? `Student was flagged for potential emotional distress. ${clarificationSummary} Manual review and supportive outreach is recommended.`
-                : 'Student was flagged for potential emotional distress during a wellbeing conversation. Manual review and supportive outreach is recommended.',
-        };
-    }
+    // Graceful fallback
+    return {
+      summary: clarificationSummary
+        ? `Student was flagged for potential emotional distress. ${clarificationSummary}`
+        : 'Student was flagged for potential emotional distress during a wellbeing conversation.',
+      riskLevel: 'moderate',
+      observedBehaviors: themes.length > 0 ? themes : ['Emotional distress indicators observed'],
+      recommendedActions: ['Manual review and supportive outreach is recommended'],
+      contextNotes: clarificationSummary || '',
+      reportText: clarificationSummary
+        ? `Student was flagged for potential emotional distress. ${clarificationSummary} Manual review and supportive outreach is recommended.`
+        : 'Student was flagged for potential emotional distress during a wellbeing conversation. Manual review and supportive outreach is recommended.',
+    };
+  }
 }

@@ -1,4 +1,4 @@
-import { PIIFilter } from "@philotheephilix/piifilter";
+import { PIIFilter } from '@philotheephilix/piifilter';
 
 /**
  * PII Filter — scoped for wellbeing chat context.
@@ -20,38 +20,50 @@ import { PIIFilter } from "@philotheephilix/piifilter";
  * - Phone numbers
  * - Institution-specific: roll numbers, department codes, hostel codes
  */
-const pf = new PIIFilter({ detectors: ["EMAIL", "PHONE"] });
+const pf = new PIIFilter({ detectors: ['EMAIL', 'PHONE'] });
 
 // Institution-specific patterns — adjust regex to match your college's formats
-pf.addCustomPattern("ROLL_NUMBER", "\\d{2}[A-Z]{2,4}\\d{3,5}");
-pf.addCustomPattern("DEPT_CODE", "\\b(CSE|ECE|MECH|CIVIL|EEE|IT|AIDS|AIML|BME|CHE)\\b");
-pf.addCustomPattern("HOSTEL", "\\b(BH-[A-Z]|GH-[A-Z])\\b");
+pf.addCustomPattern('ROLL_NUMBER', '\\d{2}[A-Z]{2,4}\\d{3,5}');
+pf.addCustomPattern('DEPT_CODE', '\\b(CSE|ECE|MECH|CIVIL|EEE|IT|AIDS|AIML|BME|CHE)\\b');
+pf.addCustomPattern('HOSTEL', '\\b(BH-[A-Z]|GH-[A-Z])\\b');
 
 /**
- * Sanitize text by replacing PII with placeholders like [EMAIL_1], [PHONE_2], etc.
- * Returns the sanitized text and a sessionId for later reconstruction.
+ * Sanitizes input text by replacing PII with deterministic placeholders like [EMAIL_1].
+ * Creates an internal robust mapping session for safe LLM processing.
+ *
+ * @param text - The raw, potentially sensitive text input
+ * @returns A tuple of `[sanitizedText, sessionId]` where `sessionId` is required for later reconstruction
  */
 export function filterPII(text: string): [sanitized: string, sessionId: string] {
-    return pf.filter(text);
+  return pf.filter(text);
 }
 
 /**
- * Reconstruct original PII values from placeholders in an LLM response.
+ * Reconstructs original PII values by substituting mapping placeholders back into LLM output.
+ *
+ * @param sessionId - The tracking identifier returned from the initial `filterPII` call
+ * @param text - The sanitized text output from the LLM containing mapped placeholders
+ * @returns The final restored text containing the original PII
  */
 export function reconstructPII(sessionId: string, text: string): string {
-    return pf.reconstruct(sessionId, text);
+  return pf.reconstruct(sessionId, text);
 }
 
 /**
- * Clean up a session after use to free memory.
+ * Clears the internal PII mapping session to free memory.
+ * Should be called immediately after reconstruction is complete.
+ *
+ * @param sessionId - The tracking identifier of the completed session
  */
 export function clearPIISession(sessionId: string): void {
-    pf.clearSession(sessionId);
+  pf.clearSession(sessionId);
 }
 
 /**
- * Get the instruction text that tells the LLM to preserve placeholders.
+ * Retrieves the critical system prompt instructions ensuring the LLM handles PII placeholders correctly.
+ *
+ * @returns System prompt string instructing the LLM to preserve deterministic tags
  */
 export function getPIIPromptInstruction(): string {
-    return PIIFilter.getPromptInstruction();
+  return PIIFilter.getPromptInstruction();
 }
