@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import {
     getUserRole,
     isFaculty,
@@ -17,20 +16,16 @@ const makeUser = (role?: string) => ({
     app_metadata: role ? { role } : {},
 });
 
-// ─── getUserRole ────────────────────────────────────────────────────
+// ─── getUserRole — parametrized valid roles ─────────────────────────
 
 describe('getUserRole', () => {
-    it('returns "admin" when app_metadata.role is "admin"', () => {
-        expect(getUserRole(makeUser('admin'))).toBe('admin');
-    });
+    const validRoles = ['admin', 'faculty', 'student'] as const;
 
-    it('returns "faculty" when app_metadata.role is "faculty"', () => {
-        expect(getUserRole(makeUser('faculty'))).toBe('faculty');
-    });
-
-    it('returns "student" when app_metadata.role is "student"', () => {
-        expect(getUserRole(makeUser('student'))).toBe('student');
-    });
+    for (const role of validRoles) {
+        it(`returns "${role}" when app_metadata.role is "${role}"`, () => {
+            expect(getUserRole(makeUser(role))).toBe(role);
+        });
+    }
 
     it('falls back to "student" when role is not set', () => {
         expect(getUserRole(makeUser())).toBe('student');
@@ -46,6 +41,15 @@ describe('getUserRole', () => {
 
     it('falls back to "student" for unknown role strings', () => {
         expect(getUserRole(makeUser('superadmin'))).toBe('student');
+    });
+
+    // Type safety
+    it('handles numeric role gracefully', () => {
+        expect(getUserRole({ app_metadata: { role: 123 } })).toBe('student');
+    });
+
+    it('handles object role gracefully', () => {
+        expect(getUserRole({ app_metadata: { role: {} } })).toBe('student');
     });
 });
 
@@ -92,17 +96,20 @@ describe('isAdmin', () => {
 // ─── canAccessFacultyRoutes ─────────────────────────────────────────
 
 describe('canAccessFacultyRoutes', () => {
-    it('returns true for faculty users', () => {
-        expect(canAccessFacultyRoutes(makeUser('faculty'))).toBe(true);
-    });
+    const allowedRoles = ['faculty', 'admin'];
+    const deniedRoles = ['student'];
 
-    it('returns true for admin users (superset of faculty)', () => {
-        expect(canAccessFacultyRoutes(makeUser('admin'))).toBe(true);
-    });
+    for (const role of allowedRoles) {
+        it(`returns true for ${role} users`, () => {
+            expect(canAccessFacultyRoutes(makeUser(role))).toBe(true);
+        });
+    }
 
-    it('returns false for student users', () => {
-        expect(canAccessFacultyRoutes(makeUser('student'))).toBe(false);
-    });
+    for (const role of deniedRoles) {
+        it(`returns false for ${role} users`, () => {
+            expect(canAccessFacultyRoutes(makeUser(role))).toBe(false);
+        });
+    }
 
     it('returns false for null user', () => {
         expect(canAccessFacultyRoutes(null)).toBe(false);
@@ -113,27 +120,24 @@ describe('canAccessFacultyRoutes', () => {
     });
 });
 
-// ─── getDashboardPath ───────────────────────────────────────────────
+// ─── getDashboardPath — parametrized ────────────────────────────────
 
 describe('getDashboardPath', () => {
-    it('returns /admin-dashboard for admin users', () => {
-        expect(getDashboardPath(makeUser('admin'))).toBe('/admin-dashboard');
-    });
+    const cases: [string | undefined, string][] = [
+        ['admin', '/admin-dashboard'],
+        ['faculty', '/faculty-dashboard'],
+        ['student', '/dashboard'],
+        [undefined, '/dashboard'],
+    ];
 
-    it('returns /faculty-dashboard for faculty users', () => {
-        expect(getDashboardPath(makeUser('faculty'))).toBe('/faculty-dashboard');
-    });
-
-    it('returns /dashboard for student users', () => {
-        expect(getDashboardPath(makeUser('student'))).toBe('/dashboard');
-    });
+    for (const [role, expectedPath] of cases) {
+        it(`returns "${expectedPath}" for ${role ?? 'no'} role`, () => {
+            expect(getDashboardPath(makeUser(role))).toBe(expectedPath);
+        });
+    }
 
     it('returns /dashboard for null user (fallback)', () => {
         expect(getDashboardPath(null)).toBe('/dashboard');
-    });
-
-    it('returns /dashboard for user without role metadata', () => {
-        expect(getDashboardPath(makeUser())).toBe('/dashboard');
     });
 });
 
@@ -157,5 +161,18 @@ describe('Route constants', () => {
     it('SHARED_ROUTES includes /dashboard and /report-incident', () => {
         expect(SHARED_ROUTES).toContain('/dashboard');
         expect(SHARED_ROUTES).toContain('/report-incident');
+    });
+
+    // Immutability guards
+    it('ADMIN_ONLY_ROUTES should be immutable (frozen)', () => {
+        expect(Object.isFrozen(ADMIN_ONLY_ROUTES)).toBe(true);
+    });
+
+    it('FACULTY_ROUTES should be immutable (frozen)', () => {
+        expect(Object.isFrozen(FACULTY_ROUTES)).toBe(true);
+    });
+
+    it('SHARED_ROUTES should be immutable (frozen)', () => {
+        expect(Object.isFrozen(SHARED_ROUTES)).toBe(true);
     });
 });

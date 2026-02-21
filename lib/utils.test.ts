@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { cn } from './utils';
 
 describe('cn', () => {
@@ -14,7 +13,6 @@ describe('cn', () => {
     });
 
     it('resolves Tailwind conflicts by keeping the last class', () => {
-        // tailwind-merge should resolve px-4 vs px-2 → px-2 wins
         const result = cn('px-4', 'px-2');
         expect(result).toBe('px-2');
     });
@@ -29,5 +27,14 @@ describe('cn', () => {
 
     it('handles array inputs', () => {
         expect(cn(['foo', 'bar'])).toBe('foo bar');
+    });
+
+    // Type safety
+    it('handles numeric input without crashing', () => {
+        expect(() => cn(123 as any)).not.toThrow();
+    });
+
+    it('handles object-only input', () => {
+        expect(cn({ active: true, hidden: false })).toBe('active');
     });
 });

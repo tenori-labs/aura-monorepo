@@ -1,32 +1,13 @@
-import { describe, it, expect } from 'vitest';
 import { isValidCategory, INCIDENT_CATEGORIES } from './admin-validation';
 
-// ─── isValidCategory ────────────────────────────────────────────────
+// ─── isValidCategory — parametrized valid inputs ────────────────────
 
 describe('isValidCategory', () => {
-    it('accepts "Academic Integrity"', () => {
-        expect(isValidCategory('Academic Integrity')).toBe(true);
-    });
-
-    it('accepts "Harassment/Bullying"', () => {
-        expect(isValidCategory('Harassment/Bullying')).toBe(true);
-    });
-
-    it('accepts "Safety/Security"', () => {
-        expect(isValidCategory('Safety/Security')).toBe(true);
-    });
-
-    it('accepts "Medical Emergency"', () => {
-        expect(isValidCategory('Medical Emergency')).toBe(true);
-    });
-
-    it('accepts "Facilities Issue"', () => {
-        expect(isValidCategory('Facilities Issue')).toBe(true);
-    });
-
-    it('accepts "Other"', () => {
-        expect(isValidCategory('Other')).toBe(true);
-    });
+    for (const category of INCIDENT_CATEGORIES) {
+        it(`accepts "${category}"`, () => {
+            expect(isValidCategory(category)).toBe(true);
+        });
+    }
 
     it('rejects unknown category strings', () => {
         expect(isValidCategory('Vandalism')).toBe(false);
@@ -43,6 +24,14 @@ describe('isValidCategory', () => {
     it('rejects whitespace-padded categories', () => {
         expect(isValidCategory(' Other ')).toBe(false);
     });
+
+    // Type safety — production code WILL get garbage input
+    it('rejects non-string values', () => {
+        expect(isValidCategory(null as any)).toBe(false);
+        expect(isValidCategory(undefined as any)).toBe(false);
+        expect(isValidCategory(123 as any)).toBe(false);
+        expect(isValidCategory({} as any)).toBe(false);
+    });
 });
 
 // ─── INCIDENT_CATEGORIES constant ───────────────────────────────────
@@ -53,11 +42,20 @@ describe('INCIDENT_CATEGORIES', () => {
     });
 
     it('includes all expected categories', () => {
-        expect(INCIDENT_CATEGORIES).toContain('Academic Integrity');
-        expect(INCIDENT_CATEGORIES).toContain('Harassment/Bullying');
-        expect(INCIDENT_CATEGORIES).toContain('Safety/Security');
-        expect(INCIDENT_CATEGORIES).toContain('Medical Emergency');
-        expect(INCIDENT_CATEGORIES).toContain('Facilities Issue');
-        expect(INCIDENT_CATEGORIES).toContain('Other');
+        const expected = [
+            'Academic Integrity',
+            'Harassment/Bullying',
+            'Safety/Security',
+            'Medical Emergency',
+            'Facilities Issue',
+            'Other',
+        ];
+        for (const cat of expected) {
+            expect(INCIDENT_CATEGORIES).toContain(cat);
+        }
+    });
+
+    it('should be immutable (frozen)', () => {
+        expect(Object.isFrozen(INCIDENT_CATEGORIES)).toBe(true);
     });
 });

@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import {
     validateRequiredFields,
     validateFileSize,
@@ -19,60 +18,29 @@ describe('validateRequiredFields', () => {
         ).toBe(true);
     });
 
-    it('returns false when type is missing', () => {
-        expect(
-            validateRequiredFields({
-                type: null,
-                date: '2026-02-20',
-                location: 'Library',
-                description: 'An incident occurred',
-            })
-        ).toBe(false);
-    });
+    const requiredKeys = ['type', 'date', 'location', 'description'] as const;
 
-    it('returns false when date is missing', () => {
-        expect(
-            validateRequiredFields({
-                type: 'Safety/Security',
-                date: null,
-                location: 'Library',
-                description: 'An incident occurred',
-            })
-        ).toBe(false);
-    });
-
-    it('returns false when location is missing', () => {
-        expect(
-            validateRequiredFields({
-                type: 'Safety/Security',
-                date: '2026-02-20',
-                location: null,
-                description: 'An incident occurred',
-            })
-        ).toBe(false);
-    });
-
-    it('returns false when description is missing', () => {
-        expect(
-            validateRequiredFields({
+    for (const key of requiredKeys) {
+        it(`returns false when ${key} is null`, () => {
+            const fields = {
                 type: 'Safety/Security',
                 date: '2026-02-20',
                 location: 'Library',
-                description: null,
-            })
-        ).toBe(false);
-    });
+                description: 'An incident occurred',
+            };
+            expect(validateRequiredFields({ ...fields, [key]: null })).toBe(false);
+        });
 
-    it('returns false when type is an empty string', () => {
-        expect(
-            validateRequiredFields({
-                type: '',
+        it(`returns false when ${key} is an empty string`, () => {
+            const fields = {
+                type: 'Safety/Security',
                 date: '2026-02-20',
                 location: 'Library',
                 description: 'An incident occurred',
-            })
-        ).toBe(false);
-    });
+            };
+            expect(validateRequiredFields({ ...fields, [key]: '' })).toBe(false);
+        });
+    }
 
     it('returns false when all fields are null', () => {
         expect(
@@ -81,6 +49,18 @@ describe('validateRequiredFields', () => {
                 date: null,
                 location: null,
                 description: null,
+            })
+        ).toBe(false);
+    });
+
+    // Type safety
+    it('handles undefined values gracefully', () => {
+        expect(
+            validateRequiredFields({
+                type: undefined as any,
+                date: '2026-02-20',
+                location: 'Library',
+                description: 'test',
             })
         ).toBe(false);
     });
@@ -93,16 +73,25 @@ describe('validateFileSize', () => {
         expect(validateFileSize(1024)).toBe(true);
     });
 
-    it('accepts files exactly at 5MB', () => {
+    it('accepts files exactly at 5MB (boundary)', () => {
         expect(validateFileSize(MAX_FILE_SIZE)).toBe(true);
     });
 
-    it('rejects files over 5MB', () => {
+    it('rejects files over 5MB (boundary + 1)', () => {
         expect(validateFileSize(MAX_FILE_SIZE + 1)).toBe(false);
     });
 
     it('accepts zero byte files', () => {
         expect(validateFileSize(0)).toBe(true);
+    });
+
+    // Type safety
+    it('handles negative numbers', () => {
+        expect(validateFileSize(-1)).toBe(true); // -1 <= MAX is true
+    });
+
+    it('handles NaN gracefully', () => {
+        expect(validateFileSize(NaN)).toBe(false);
     });
 });
 

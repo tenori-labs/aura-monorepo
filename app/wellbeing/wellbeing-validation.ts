@@ -14,6 +14,6 @@ export const MIN_REASON_LENGTH = 5;
  * @returns true if the reason is non-empty and at least MIN_REASON_LENGTH characters, false otherwise
  */
 export function isValidRevealReason(reason: string | null | undefined): boolean {
-    if (!reason) return false;
+    if (!reason || typeof reason !== 'string') return false;
     return reason.trim().length >= MIN_REASON_LENGTH;
 }

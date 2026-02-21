@@ -1,24 +1,17 @@
-import { describe, it, expect } from 'vitest';
 import {
     isValidStatus,
     getInvalidStatusError,
     VALID_STATUSES,
 } from './incident-validation';
 
-// ─── isValidStatus ──────────────────────────────────────────────────
+// ─── isValidStatus — parametrized valid inputs ──────────────────────
 
 describe('isValidStatus', () => {
-    it('accepts "pending" as a valid status', () => {
-        expect(isValidStatus('pending')).toBe(true);
-    });
-
-    it('accepts "reviewing" as a valid status', () => {
-        expect(isValidStatus('reviewing')).toBe(true);
-    });
-
-    it('accepts "closed" as a valid status', () => {
-        expect(isValidStatus('closed')).toBe(true);
-    });
+    for (const status of VALID_STATUSES) {
+        it(`accepts "${status}"`, () => {
+            expect(isValidStatus(status)).toBe(true);
+        });
+    }
 
     it('rejects an unknown status string', () => {
         expect(isValidStatus('archived')).toBe(false);
@@ -34,6 +27,14 @@ describe('isValidStatus', () => {
 
     it('rejects whitespace-padded valid statuses', () => {
         expect(isValidStatus(' pending ')).toBe(false);
+    });
+
+    // Type safety — production code WILL get garbage input
+    it('rejects non-string values', () => {
+        expect(isValidStatus(null as any)).toBe(false);
+        expect(isValidStatus(undefined as any)).toBe(false);
+        expect(isValidStatus(123 as any)).toBe(false);
+        expect(isValidStatus({} as any)).toBe(false);
     });
 });
 
@@ -51,6 +52,11 @@ describe('getInvalidStatusError', () => {
             expect(msg).toContain(status);
         }
     });
+
+    it('has a consistent error format', () => {
+        const msg = getInvalidStatusError('bad');
+        expect(msg).toMatch(/Invalid status/i);
+    });
 });
 
 // ─── VALID_STATUSES constant ────────────────────────────────────────
@@ -64,5 +70,9 @@ describe('VALID_STATUSES', () => {
         expect(VALID_STATUSES).toContain('pending');
         expect(VALID_STATUSES).toContain('reviewing');
         expect(VALID_STATUSES).toContain('closed');
+    });
+
+    it('should be immutable (frozen)', () => {
+        expect(Object.isFrozen(VALID_STATUSES)).toBe(true);
     });
 });

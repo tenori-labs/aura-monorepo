@@ -1,19 +1,19 @@
 export type UserRole = 'student' | 'faculty' | 'admin';
 
 /** Routes only accessible by admins */
-export const ADMIN_ONLY_ROUTES = ['/admin-dashboard', '/wellbeing'];
+export const ADMIN_ONLY_ROUTES = Object.freeze(['/admin-dashboard', '/wellbeing']);
 
 /** Routes accessible by faculty AND admins (but not students) */
-export const FACULTY_ROUTES = ['/faculty-dashboard'];
+export const FACULTY_ROUTES = Object.freeze(['/faculty-dashboard']);
 
 /** Routes accessible by all authenticated users */
-export const SHARED_ROUTES = [
+export const SHARED_ROUTES = Object.freeze([
   '/dashboard',
   '/report-incident',
   '/ai-assistant',
   '/consent-form',
   '/charts',
-];
+]);
 
 /** All protected routes (require login) */
 export const ALL_PROTECTED_ROUTES = [...SHARED_ROUTES, ...FACULTY_ROUTES, ...ADMIN_ONLY_ROUTES];

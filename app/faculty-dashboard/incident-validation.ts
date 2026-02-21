@@ -4,7 +4,7 @@
  */
 
 /** The allowed incident report statuses */
-export const VALID_STATUSES = ['pending', 'reviewing', 'closed'] as const;
+export const VALID_STATUSES = Object.freeze(['pending', 'reviewing', 'closed'] as const);
 
 /**
  * Validates whether a given status is an allowed incident report status.

@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { isValidRevealReason, MIN_REASON_LENGTH } from './wellbeing-validation';
 
 // ─── isValidRevealReason ────────────────────────────────────────────
@@ -8,11 +7,11 @@ describe('isValidRevealReason', () => {
         expect(isValidRevealReason('Student welfare concern')).toBe(true);
     });
 
-    it('accepts a reason with exactly 5 characters', () => {
+    it('accepts a reason with exactly 5 characters (boundary)', () => {
         expect(isValidRevealReason('abcde')).toBe(true);
     });
 
-    it('rejects a reason with fewer than 5 characters', () => {
+    it('rejects a reason with fewer than 5 characters (boundary - 1)', () => {
         expect(isValidRevealReason('abcd')).toBe(false);
     });
 
@@ -38,6 +37,13 @@ describe('isValidRevealReason', () => {
 
     it('accepts a reason with leading/trailing whitespace but 5+ trimmed chars', () => {
         expect(isValidRevealReason('  hello  ')).toBe(true);
+    });
+
+    // Type safety
+    it('rejects non-string values', () => {
+        expect(isValidRevealReason(123 as any)).toBe(false);
+        expect(isValidRevealReason({} as any)).toBe(false);
+        expect(isValidRevealReason([] as any)).toBe(false);
     });
 });
 

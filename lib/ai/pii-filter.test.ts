@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { filterPII, reconstructPII, clearPIISession, getPIIPromptInstruction } from './pii-filter';
 
 // ─── filterPII ──────────────────────────────────────────────────────
@@ -32,6 +31,12 @@ describe('filterPII', () => {
         expect(sanitized).toContain('[EMAIL_1]');
         expect(sanitized).toContain('[EMAIL_2]');
     });
+
+    // Type safety
+    it('handles non-string input gracefully', () => {
+        expect(() => filterPII(null as any)).toThrow();
+        expect(() => filterPII(undefined as any)).toThrow();
+    });
 });
 
 // ─── reconstructPII ─────────────────────────────────────────────────
@@ -49,6 +54,12 @@ describe('reconstructPII', () => {
         const [, sessionId] = filterPII('no PII here');
         const result = reconstructPII(sessionId, 'just plain text');
         expect(result).toBe('just plain text');
+    });
+
+    // Placeholder format consistency
+    it('uses deterministic placeholder format [TYPE_N]', () => {
+        const [sanitized] = filterPII('Email me at test@example.com');
+        expect(sanitized).toMatch(/\[EMAIL_\d+\]/);
     });
 });
 
@@ -72,5 +83,10 @@ describe('getPIIPromptInstruction', () => {
         const instruction = getPIIPromptInstruction();
         expect(typeof instruction).toBe('string');
         expect(instruction.length).toBeGreaterThan(0);
+    });
+
+    it('has a consistent format mentioning placeholders', () => {
+        const instruction = getPIIPromptInstruction();
+        expect(instruction).toMatch(/\[/); // should reference placeholder syntax
     });
 });

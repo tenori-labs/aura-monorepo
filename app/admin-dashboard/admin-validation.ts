@@ -4,14 +4,14 @@
  */
 
 /** The 6 incident categories from the report form */
-export const INCIDENT_CATEGORIES = [
+export const INCIDENT_CATEGORIES = Object.freeze([
     'Academic Integrity',
     'Harassment/Bullying',
     'Safety/Security',
     'Medical Emergency',
     'Facilities Issue',
     'Other',
-] as const;
+] as const);
 
 /**
  * Validates whether a given category string is one of the allowed incident categories.
