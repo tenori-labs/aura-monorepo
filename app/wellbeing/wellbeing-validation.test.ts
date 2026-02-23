@@ -41,9 +41,9 @@ describe('isValidRevealReason', () => {
 
     // Type safety
     it('rejects non-string values', () => {
-        expect(isValidRevealReason(123 as any)).toBe(false);
-        expect(isValidRevealReason({} as any)).toBe(false);
-        expect(isValidRevealReason([] as any)).toBe(false);
+        expect(isValidRevealReason(123 as unknown as string | null | undefined)).toBe(false);
+        expect(isValidRevealReason({} as unknown as string | null | undefined)).toBe(false);
+        expect(isValidRevealReason([] as unknown as string | null | undefined)).toBe(false);
     });
 });
 

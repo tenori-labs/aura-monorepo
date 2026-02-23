@@ -30,3 +30,17 @@ export function validateRequiredFields(fields: {
 export function validateFileSize(fileSize: number): boolean {
     return fileSize <= MAX_FILE_SIZE;
 }
+
+/**
+ * Validates that a date string is a valid date and is not in the future.
+ * Incidents cannot be reported for dates that haven't occurred yet.
+ *
+ * @param dateStr - The date string from the form (datetime-local format)
+ * @returns true if the date is valid and not in the future, false otherwise
+ */
+export function validateDate(dateStr: string | null): boolean {
+    if (!dateStr || typeof dateStr !== 'string') return false;
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+    return date <= new Date();
+}

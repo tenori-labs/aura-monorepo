@@ -142,6 +142,7 @@ export default function ReportIncidentPage() {
                       type="datetime-local"
                       name="date"
                       required
+                      max={new Date().toISOString().slice(0, 16)}
                       style={{
                         width: '100%',
                         padding: 'var(--space-2)',

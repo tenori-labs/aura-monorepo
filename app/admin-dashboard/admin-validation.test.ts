@@ -27,10 +27,10 @@ describe('isValidCategory', () => {
 
     // Type safety — production code WILL get garbage input
     it('rejects non-string values', () => {
-        expect(isValidCategory(null as any)).toBe(false);
-        expect(isValidCategory(undefined as any)).toBe(false);
-        expect(isValidCategory(123 as any)).toBe(false);
-        expect(isValidCategory({} as any)).toBe(false);
+        expect(isValidCategory(null as unknown as string)).toBe(false);
+        expect(isValidCategory(undefined as unknown as string)).toBe(false);
+        expect(isValidCategory(123 as unknown as string)).toBe(false);
+        expect(isValidCategory({} as unknown as string)).toBe(false);
     });
 });
 

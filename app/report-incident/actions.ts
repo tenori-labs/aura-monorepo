@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { classifyIncidentReport } from '@/lib/ai/flows/classify-incident-report';
 import prisma from '@/lib/db';
-import { validateRequiredFields, validateFileSize } from './report-validation';
+import { validateRequiredFields, validateFileSize, validateDate } from './report-validation';
 
 /**
  * Submit a new incident report from the student portal.
@@ -33,6 +33,10 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
   // 3. Validation
   if (!validateRequiredFields({ type, date, location, description })) {
     return { error: 'Please fill in all required fields.' };
+  }
+
+  if (!validateDate(date)) {
+    return { error: 'Please enter a valid date. Future dates are not allowed.' };
   }
 
   if (file && !validateFileSize(file.size)) {

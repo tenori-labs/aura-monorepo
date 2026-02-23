@@ -31,10 +31,10 @@ describe('isValidStatus', () => {
 
     // Type safety — production code WILL get garbage input
     it('rejects non-string values', () => {
-        expect(isValidStatus(null as any)).toBe(false);
-        expect(isValidStatus(undefined as any)).toBe(false);
-        expect(isValidStatus(123 as any)).toBe(false);
-        expect(isValidStatus({} as any)).toBe(false);
+        expect(isValidStatus(null as unknown as string)).toBe(false);
+        expect(isValidStatus(undefined as unknown as string)).toBe(false);
+        expect(isValidStatus(123 as unknown as string)).toBe(false);
+        expect(isValidStatus({} as unknown as string)).toBe(false);
     });
 });
 

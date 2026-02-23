@@ -37,14 +37,14 @@ describe('isSignatureValid', () => {
 
     // Type safety — production forms can submit garbage
     it('handles null values gracefully', () => {
-        expect(() => isSignatureValid(null as any, 'John')).toThrow();
+        expect(() => isSignatureValid(null as unknown as string, 'John')).toThrow();
     });
 
     it('handles undefined values gracefully', () => {
-        expect(() => isSignatureValid(undefined as any, 'John')).toThrow();
+        expect(() => isSignatureValid(undefined as unknown as string, 'John')).toThrow();
     });
 
     it('handles numeric input gracefully', () => {
-        expect(() => isSignatureValid(123 as any, 'John')).toThrow();
+        expect(() => isSignatureValid(123 as unknown as string, 'John')).toThrow();
     });
 });

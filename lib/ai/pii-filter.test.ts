@@ -34,8 +34,8 @@ describe('filterPII', () => {
 
     // Type safety
     it('handles non-string input gracefully', () => {
-        expect(() => filterPII(null as any)).toThrow();
-        expect(() => filterPII(undefined as any)).toThrow();
+        expect(() => filterPII(null as unknown as string)).toThrow();
+        expect(() => filterPII(undefined as unknown as string)).toThrow();
     });
 });
 
