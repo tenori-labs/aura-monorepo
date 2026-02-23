@@ -1,78 +1,92 @@
+'use client';
 
-"use client";
-
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import type { Counselor, TimeSlot } from "@/lib/types";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { format, parse, addDays, parseISO, isValid } from "date-fns";
-import { ChevronLeft, Clock, UserCheck, CalendarDays, Sparkles, AlertTriangle, Loader2 } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import type { Counselor, TimeSlot } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useToast } from '@/hooks/use-toast';
+import { format, parse, addDays, parseISO, isValid } from 'date-fns';
+import {
+  ChevronLeft,
+  Clock,
+  UserCheck,
+  CalendarDays,
+  Sparkles,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
 
 const dummyCounselors: Counselor[] = [
   {
-    id: "c1",
-    name: "Dr. Emily Carter",
-    specialty: "Stress & Anxiety Management",
-    avatarUrl: "https://placehold.co/80x80/a5b4fc/1e293b.png", // Purple-ish
+    id: 'c1',
+    name: 'Dr. Emily Carter',
+    specialty: 'Stress & Anxiety Management',
+    avatarUrl: 'https://placehold.co/80x80/a5b4fc/1e293b.png', // Purple-ish
     availability: {
-      [format(addDays(new Date(), 1), "yyyy-MM-dd")]: [
-        { id: "t1", time: "09:00 AM", isBooked: false },
-        { id: "t2", time: "10:00 AM", isBooked: true },
-        { id: "t3", time: "11:00 AM", isBooked: false },
+      [format(addDays(new Date(), 1), 'yyyy-MM-dd')]: [
+        { id: 't1', time: '09:00 AM', isBooked: false },
+        { id: 't2', time: '10:00 AM', isBooked: true },
+        { id: 't3', time: '11:00 AM', isBooked: false },
       ],
-      [format(addDays(new Date(), 2), "yyyy-MM-dd")]: [
-        { id: "t4", time: "02:00 PM", isBooked: false },
-        { id: "t5", time: "03:00 PM", isBooked: false },
+      [format(addDays(new Date(), 2), 'yyyy-MM-dd')]: [
+        { id: 't4', time: '02:00 PM', isBooked: false },
+        { id: 't5', time: '03:00 PM', isBooked: false },
       ],
-      [format(addDays(new Date(), 3), "yyyy-MM-dd")]: [
-         { id: "t6", time: "09:30 AM", isBooked: false },
-         { id: "t7", time: "10:30 AM", isBooked: true },
-      ]
+      [format(addDays(new Date(), 3), 'yyyy-MM-dd')]: [
+        { id: 't6', time: '09:30 AM', isBooked: false },
+        { id: 't7', time: '10:30 AM', isBooked: true },
+      ],
     },
   },
   {
-    id: "c2",
-    name: "Mr. David Lee",
-    specialty: "Academic & Career Counseling",
-    avatarUrl: "https://placehold.co/80x80/93c5fd/1e3a8a.png", // Blue
+    id: 'c2',
+    name: 'Mr. David Lee',
+    specialty: 'Academic & Career Counseling',
+    avatarUrl: 'https://placehold.co/80x80/93c5fd/1e3a8a.png', // Blue
     availability: {
-      [format(addDays(new Date(), 1), "yyyy-MM-dd")]: [
-        { id: "t8", time: "01:00 PM", isBooked: false },
-        { id: "t9", time: "02:00 PM", isBooked: false },
+      [format(addDays(new Date(), 1), 'yyyy-MM-dd')]: [
+        { id: 't8', time: '01:00 PM', isBooked: false },
+        { id: 't9', time: '02:00 PM', isBooked: false },
       ],
-      [format(addDays(new Date(), 3), "yyyy-MM-dd")]: [
-        { id: "t10", time: "10:00 AM", isBooked: true },
-        { id: "t11", time: "11:00 AM", isBooked: false },
-        { id: "t12", time: "01:00 PM", isBooked: false },
+      [format(addDays(new Date(), 3), 'yyyy-MM-dd')]: [
+        { id: 't10', time: '10:00 AM', isBooked: true },
+        { id: 't11', time: '11:00 AM', isBooked: false },
+        { id: 't12', time: '01:00 PM', isBooked: false },
       ],
-       [format(addDays(new Date(), 4), "yyyy-MM-dd")]: [
-        { id: "t13", time: "03:00 PM", isBooked: false },
-      ]
+      [format(addDays(new Date(), 4), 'yyyy-MM-dd')]: [
+        { id: 't13', time: '03:00 PM', isBooked: false },
+      ],
     },
   },
   {
-    id: "c3",
-    name: "Ms. Sarah Chen",
-    specialty: "Relationship & Social Support",
-    avatarUrl: "https://placehold.co/80x80/a7f3d0/047857.png", // Green
+    id: 'c3',
+    name: 'Ms. Sarah Chen',
+    specialty: 'Relationship & Social Support',
+    avatarUrl: 'https://placehold.co/80x80/a7f3d0/047857.png', // Green
     availability: {
-        [format(addDays(new Date(), 2), "yyyy-MM-dd")]: [
-            { id: "t14", time: "10:00 AM", isBooked: false },
-            { id: "t15", time: "11:00 AM", isBooked: false },
-        ],
-        [format(addDays(new Date(), 5), "yyyy-MM-dd")]: [
-            { id: "t16", time: "09:00 AM", isBooked: true },
-            { id: "t17", time: "10:00 AM", isBooked: false },
-        ],
-    }
-  }
+      [format(addDays(new Date(), 2), 'yyyy-MM-dd')]: [
+        { id: 't14', time: '10:00 AM', isBooked: false },
+        { id: 't15', time: '11:00 AM', isBooked: false },
+      ],
+      [format(addDays(new Date(), 5), 'yyyy-MM-dd')]: [
+        { id: 't16', time: '09:00 AM', isBooked: true },
+        { id: 't17', time: '10:00 AM', isBooked: false },
+      ],
+    },
+  },
 ];
 
 export default function ScheduleCounselorPage() {
@@ -86,9 +100,9 @@ export default function ScheduleCounselorPage() {
 
   useEffect(() => {
     if (selectedCounselor && selectedDate) {
-      const dateString = format(selectedDate, "yyyy-MM-dd");
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
       const slotsForDate = selectedCounselor.availability?.[dateString] || [];
-      setAvailableSlots(slotsForDate.filter(slot => !slot.isBooked));
+      setAvailableSlots(slotsForDate.filter((slot) => !slot.isBooked));
       setSelectedSlot(null); // Reset selected slot when date changes
     } else {
       setAvailableSlots([]);
@@ -96,7 +110,7 @@ export default function ScheduleCounselorPage() {
   }, [selectedCounselor, selectedDate]);
 
   const handleCounselorSelect = (counselorId: string) => {
-    const counselor = dummyCounselors.find(c => c.id === counselorId);
+    const counselor = dummyCounselors.find((c) => c.id === counselorId);
     setSelectedCounselor(counselor || null);
     setSelectedDate(undefined); // Reset date when counselor changes
     setSelectedSlot(null);
@@ -105,9 +119,9 @@ export default function ScheduleCounselorPage() {
   const handleScheduleAppointment = () => {
     if (!selectedCounselor || !selectedDate || !selectedSlot) {
       toast({
-        title: "Incomplete Selection",
-        description: "Please select a counselor, date, and time slot.",
-        variant: "destructive",
+        title: 'Incomplete Selection',
+        description: 'Please select a counselor, date, and time slot.',
+        variant: 'destructive',
       });
       return;
     }
@@ -115,19 +129,23 @@ export default function ScheduleCounselorPage() {
     // Simulate API call
     setTimeout(() => {
       toast({
-        title: "Appointment Scheduled! (Simulated)",
-        description: `Your appointment with ${selectedCounselor.name} on ${format(selectedDate, "PPP")} at ${selectedSlot.time} has been booked.`,
+        title: 'Appointment Scheduled! (Simulated)',
+        description: `Your appointment with ${selectedCounselor.name} on ${format(selectedDate, 'PPP')} at ${selectedSlot.time} has been booked.`,
         duration: 5000,
       });
       // Mark slot as booked (locally, for this session)
-      const dateString = format(selectedDate, "yyyy-MM-dd");
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
       if (selectedCounselor.availability?.[dateString]) {
-          const slotIndex = selectedCounselor.availability[dateString].findIndex(s => s.id === selectedSlot.id);
-          if (slotIndex > -1) {
-              // This is a dummy update for demo purposes
-              // In a real app, this would be managed by backend state
-              console.log(`Marking slot ${selectedSlot.id} as booked for ${selectedCounselor.name} on ${dateString}`);
-          }
+        const slotIndex = selectedCounselor.availability[dateString].findIndex(
+          (s) => s.id === selectedSlot.id
+        );
+        if (slotIndex > -1) {
+          // This is a dummy update for demo purposes
+          // In a real app, this would be managed by backend state
+          console.log(
+            `Marking slot ${selectedSlot.id} as booked for ${selectedCounselor.name} on ${dateString}`
+          );
+        }
       }
       setSelectedSlot(null);
       // Optionally, reset other selections or navigate away
@@ -138,7 +156,7 @@ export default function ScheduleCounselorPage() {
   };
 
   const today = new Date();
-  today.setHours(0,0,0,0); // Ensure comparison is only for date part
+  today.setHours(0, 0, 0, 0); // Ensure comparison is only for date part
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -159,17 +177,20 @@ export default function ScheduleCounselorPage() {
           {/* Step 1: Select Counselor */}
           <section>
             <h2 className="text-xl font-semibold mb-4 text-foreground flex items-center">
-                <UserCheck className="mr-2 h-6 w-6 text-primary"/> Select a Counselor
+              <UserCheck className="mr-2 h-6 w-6 text-primary" /> Select a Counselor
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {dummyCounselors.map((counselor) => (
-                <Card 
-                  key={counselor.id} 
+                <Card
+                  key={counselor.id}
                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedCounselor?.id === counselor.id ? 'ring-2 ring-primary shadow-lg' : 'shadow-md'}`}
                   onClick={() => handleCounselorSelect(counselor.id)}
                 >
                   <CardHeader className="flex flex-row items-center gap-4 p-4">
-                    <Avatar className="h-16 w-16 border-2 border-primary" data-ai-hint="counselor avatar">
+                    <Avatar
+                      className="h-16 w-16 border-2 border-primary"
+                      data-ai-hint="counselor avatar"
+                    >
                       <AvatarImage src={counselor.avatarUrl} alt={counselor.name} />
                       <AvatarFallback>{counselor.name.substring(0, 1)}</AvatarFallback>
                     </Avatar>
@@ -187,7 +208,8 @@ export default function ScheduleCounselorPage() {
           {selectedCounselor && (
             <section>
               <h2 className="text-xl font-semibold mb-4 text-foreground flex items-center">
-                <CalendarDays className="mr-2 h-6 w-6 text-primary"/> Select a Date for {selectedCounselor.name}
+                <CalendarDays className="mr-2 h-6 w-6 text-primary" /> Select a Date for{' '}
+                {selectedCounselor.name}
               </h2>
               <div className="flex justify-center p-2 bg-muted/30 rounded-md border">
                 <Calendar
@@ -195,9 +217,9 @@ export default function ScheduleCounselorPage() {
                   selected={selectedDate}
                   onSelect={setSelectedDate}
                   disabled={(date: Date) => {
-                    const dateString = format(date, "yyyy-MM-dd");
+                    const dateString = format(date, 'yyyy-MM-dd');
                     const slots = selectedCounselor.availability?.[dateString] || [];
-                    const availableFutureSlots = slots.filter(s => !s.isBooked).length > 0;
+                    const availableFutureSlots = slots.filter((s) => !s.isBooked).length > 0;
                     return date < today || !availableFutureSlots;
                   }}
                   initialFocus
@@ -210,13 +232,14 @@ export default function ScheduleCounselorPage() {
           {selectedCounselor && selectedDate && (
             <section>
               <h2 className="text-xl font-semibold mb-4 text-foreground flex items-center">
-                <Clock className="mr-2 h-6 w-6 text-primary"/> Select an Available Time on {format(selectedDate, "PPP")}
+                <Clock className="mr-2 h-6 w-6 text-primary" /> Select an Available Time on{' '}
+                {format(selectedDate, 'PPP')}
               </h2>
               {availableSlots.length > 0 ? (
                 <RadioGroup
                   value={selectedSlot?.id}
                   onValueChange={(slotId: string) => {
-                    const slot = availableSlots.find(s => s.id === slotId);
+                    const slot = availableSlots.find((s) => s.id === slotId);
                     setSelectedSlot(slot || null);
                   }}
                   className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
@@ -229,7 +252,12 @@ export default function ScheduleCounselorPage() {
                         ${selectedSlot?.id === slot.id ? 'border-primary bg-primary/10 text-primary' : 'border-muted'}
                         ${slot.isBooked ? 'cursor-not-allowed opacity-50 bg-muted/50' : 'cursor-pointer'}`}
                     >
-                      <RadioGroupItem value={slot.id} id={slot.id} className="sr-only" disabled={slot.isBooked} />
+                      <RadioGroupItem
+                        value={slot.id}
+                        id={slot.id}
+                        className="sr-only"
+                        disabled={slot.isBooked}
+                      />
                       <span className="text-lg font-medium">{slot.time}</span>
                       {slot.isBooked && <span className="text-xs mt-1">(Booked)</span>}
                     </Label>
@@ -237,25 +265,32 @@ export default function ScheduleCounselorPage() {
                 </RadioGroup>
               ) : (
                 <Card className="bg-amber-50 border-amber-200 p-4 text-center">
-                    <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2" />
-                    <p className="text-amber-700 font-medium">
-                        No available slots for {selectedCounselor.name} on {format(selectedDate, "PPP")}.
-                    </p>
-                    <p className="text-xs text-amber-600">Please try selecting a different date or counselor.</p>
+                  <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2" />
+                  <p className="text-amber-700 font-medium">
+                    No available slots for {selectedCounselor.name} on {format(selectedDate, 'PPP')}
+                    .
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    Please try selecting a different date or counselor.
+                  </p>
                 </Card>
               )}
             </section>
           )}
         </CardContent>
         <CardFooter className="border-t pt-6">
-          <Button 
-            size="lg" 
-            className="w-full sm:w-auto mx-auto" 
+          <Button
+            size="lg"
+            className="w-full sm:w-auto mx-auto"
             onClick={handleScheduleAppointment}
             disabled={!selectedCounselor || !selectedDate || !selectedSlot || isScheduling}
           >
-            {isScheduling ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Sparkles className="mr-2 h-5 w-5" />}
-            {isScheduling ? "Scheduling..." : "Confirm Appointment"}
+            {isScheduling ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-5 w-5" />
+            )}
+            {isScheduling ? 'Scheduling...' : 'Confirm Appointment'}
           </Button>
         </CardFooter>
       </Card>

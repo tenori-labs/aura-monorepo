@@ -1,11 +1,23 @@
+'use client';
 
-"use client";
-
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image'; // Import next/image
-import { Home, FilePlus2, HelpCircle, ShieldCheck, Menu, LayoutDashboard, Briefcase, Smile, HeartHandshake, User, BookHeart, FileSignature } from 'lucide-react';
+import {
+  Home,
+  FilePlus2,
+  HelpCircle,
+  ShieldCheck,
+  Menu,
+  LayoutDashboard,
+  Briefcase,
+  Smile,
+  HeartHandshake,
+  User,
+  BookHeart,
+  FileSignature,
+} from 'lucide-react';
 
 const getPageTitle = (pathname: string): string => {
   if (pathname === '/dashboard') return 'Student Dashboard';
@@ -44,15 +56,15 @@ export default function AppHeader() {
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 sm:px-6 lg:px-8 shadow-sm">
       <div className="flex items-center gap-3">
         <SidebarTrigger className="md:hidden">
-           <Menu className="h-6 w-6" />
+          <Menu className="h-6 w-6" />
         </SidebarTrigger>
         <Image
-            src="https://placehold.co/40x40/c7d2fe/312e81.png"
-            alt="Friendly Mascot"
-            width={32}
-            height={32}
-            className="rounded-full"
-            data-ai-hint="cute mascot"
+          src="https://placehold.co/40x40/c7d2fe/312e81.png"
+          alt="Friendly Mascot"
+          width={32}
+          height={32}
+          className="rounded-full"
+          data-ai-hint="cute mascot"
         />
         <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
       </div>

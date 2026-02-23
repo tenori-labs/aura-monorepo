@@ -19,15 +19,13 @@
  */
 
 import { ai } from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'genkit';
 
 /**
  * Input schema for classifying incident reports.
  */
 const ClassifyIncidentReportInputSchema = z.object({
-  reportText: z
-    .string()
-    .describe('The text content of the incident report.'),
+  reportText: z.string().describe('The text content of the incident report.'),
   media: z
     .string()
     .optional()
@@ -39,9 +37,7 @@ const ClassifyIncidentReportInputSchema = z.object({
 /**
  * Type definition for the input to the classifyIncidentReport function.
  */
-export type ClassifyIncidentReportInput = z.infer<
-  typeof ClassifyIncidentReportInputSchema
->;
+export type ClassifyIncidentReportInput = z.infer<typeof ClassifyIncidentReportInputSchema>;
 
 /**
  * Output schema for the classified incident report.
@@ -54,9 +50,7 @@ const ClassifyIncidentReportOutputSchema = z.object({
     ),
   confidence: z
     .number()
-    .describe(
-      'A confidence score (0-1) indicating the certainty of the category assignment.'
-    ),
+    .describe('A confidence score (0-1) indicating the certainty of the category assignment.'),
   keywords: z
     .array(z.string())
     .describe('Keywords extracted from the incident report text and/or image.'),
@@ -65,9 +59,7 @@ const ClassifyIncidentReportOutputSchema = z.object({
 /**
  * Type definition for the output of the classifyIncidentReport function.
  */
-export type ClassifyIncidentReportOutput = z.infer<
-  typeof ClassifyIncidentReportOutputSchema
->;
+export type ClassifyIncidentReportOutput = z.infer<typeof ClassifyIncidentReportOutputSchema>;
 
 /**
  * Main function to classify an incident report.
@@ -82,8 +74,8 @@ export async function classifyIncidentReport(
 
 const classifyIncidentReportPrompt = ai.definePrompt({
   name: 'classifyIncidentReportPrompt',
-  input: {schema: ClassifyIncidentReportInputSchema},
-  output: {schema: ClassifyIncidentReportOutputSchema},
+  input: { schema: ClassifyIncidentReportInputSchema },
+  output: { schema: ClassifyIncidentReportOutputSchema },
   prompt: `You are an AI assistant that classifies incident reports based on their text content and an optional attached image.
 
   Analyze the following incident report and determine the most appropriate category, a confidence score (between 0 and 1), and extract relevant keywords from both the text and the image if provided.
@@ -108,8 +100,8 @@ const classifyIncidentReportFlow = ai.defineFlow(
     inputSchema: ClassifyIncidentReportInputSchema,
     outputSchema: ClassifyIncidentReportOutputSchema,
   },
-  async input => {
-    const {output} = await classifyIncidentReportPrompt(input);
+  async (input) => {
+    const { output } = await classifyIncidentReportPrompt(input);
     return output!;
   }
 );
