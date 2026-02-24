@@ -1,6 +1,7 @@
 import {
     validateRequiredFields,
     validateFileSize,
+    validateDate,
     MAX_FILE_SIZE,
 } from './report-validation';
 
@@ -57,7 +58,7 @@ describe('validateRequiredFields', () => {
     it('handles undefined values gracefully', () => {
         expect(
             validateRequiredFields({
-                type: undefined as any,
+                type: undefined as unknown as string | null,
                 date: '2026-02-20',
                 location: 'Library',
                 description: 'test',
@@ -100,5 +101,43 @@ describe('validateFileSize', () => {
 describe('MAX_FILE_SIZE', () => {
     it('equals 5MB in bytes', () => {
         expect(MAX_FILE_SIZE).toBe(5 * 1024 * 1024);
+    });
+});
+
+// ─── validateDate ───────────────────────────────────────────────────
+
+describe('validateDate', () => {
+    it('accepts a past date', () => {
+        expect(validateDate('2024-01-15T10:30')).toBe(true);
+    });
+
+    it('accepts yesterday', () => {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 16);
+        expect(validateDate(yesterday)).toBe(true);
+    });
+
+    it('rejects a future date', () => {
+        expect(validateDate('2099-12-31T23:59')).toBe(false);
+    });
+
+    it('rejects tomorrow', () => {
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+        expect(validateDate(tomorrow)).toBe(false);
+    });
+
+    it('rejects an invalid date string', () => {
+        expect(validateDate('not-a-date')).toBe(false);
+    });
+
+    it('rejects an empty string', () => {
+        expect(validateDate('')).toBe(false);
+    });
+
+    it('rejects null', () => {
+        expect(validateDate(null)).toBe(false);
+    });
+
+    it('rejects undefined', () => {
+        expect(validateDate(undefined as unknown as string | null)).toBe(false);
     });
 });

@@ -42,7 +42,7 @@ export async function submitConsent(formData: FormData) {
   await prisma.consentRecord.create({
     data: {
       userId: user.id,
-      userEmail: user.email!,
+      userEmail: user.email ?? '',
       fullName: fullName,
       studentId: studentId || null,
       course: course || null,

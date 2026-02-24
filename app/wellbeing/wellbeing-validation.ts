@@ -17,3 +17,19 @@ export function isValidRevealReason(reason: string | null | undefined): boolean 
     if (!reason || typeof reason !== 'string') return false;
     return reason.trim().length >= MIN_REASON_LENGTH;
 }
+
+/** Valid statuses for wellbeing reports */
+export const VALID_WELLBEING_STATUSES = Object.freeze(
+    ['pending', 'reviewed', 'passed_on'] as const
+);
+
+/**
+ * Validates whether a status string is a valid wellbeing report status.
+ *
+ * @param status - The status string to validate
+ * @returns true if the status is one of the allowed wellbeing report statuses
+ */
+export function isValidWellbeingStatus(status: string | null | undefined): boolean {
+    if (!status || typeof status !== 'string') return false;
+    return (VALID_WELLBEING_STATUSES as readonly string[]).includes(status);
+}

@@ -15,7 +15,12 @@ export async function handleClarification(input: {
   originalMessage: string;
   studentClarification: string;
 }) {
-  return clarifyDistress(input);
+  try {
+    return await clarifyDistress(input);
+  } catch (error) {
+    console.error('[Clarify Distress] Failed:', error);
+    throw new Error('Failed to process clarification. Please try again.');
+  }
 }
 
 /**
@@ -32,33 +37,39 @@ export async function generateAndStoreReport(input: {
   studentName: string;
   uid: string;
 }) {
-  const { themes, clarificationSummary, studentName, uid } = input;
+  try {
+    const { themes, clarificationSummary, studentName, uid } = input;
 
-  // Generate structured report (themes-only, no names, no quotes)
-  const structured = await generateNeutralReport(themes, clarificationSummary);
+    // Generate structured report (themes-only, no names, no quotes)
+    const structured = await generateNeutralReport(themes, clarificationSummary);
 
-  // Store in MongoDB with all structured fields
-  const report = await prisma.wellbeingReport.create({
-    data: {
-      uid,
-      studentName,
-      reportText: structured.reportText,
-      themes,
-      status: 'pending',
-      riskLevel: structured.riskLevel,
-      summary: structured.summary,
-      observedBehaviors: structured.observedBehaviors,
-      recommendedActions: structured.recommendedActions,
-      contextNotes: structured.contextNotes,
-    },
-  });
+    // Store in MongoDB with all structured fields
+    const report = await prisma.wellbeingReport.create({
+      data: {
+        uid,
+        studentName,
+        reportText: structured.reportText,
+        themes,
+        status: 'pending',
+        riskLevel: structured.riskLevel,
+        summary: structured.summary,
+        observedBehaviors: structured.observedBehaviors,
+        recommendedActions: structured.recommendedActions,
+        contextNotes: structured.contextNotes,
+      },
+    });
 
-  console.log(
-    `[Wellbeing] Report created: caseId=${report.caseId}, uid=${uid}, risk=${structured.riskLevel}`
-  );
+    console.log(
+      `[Wellbeing] Report created: caseId=${report.caseId}, uid=${uid}, risk=${structured.riskLevel}`
+    );
 
-  return {
-    caseId: report.caseId,
-    reportId: report.id,
-  };
+    return {
+      caseId: report.caseId,
+      reportId: report.id,
+    };
+  } catch (error) {
+    console.error('[Wellbeing Report] Failed:', error);
+    throw new Error('Failed to generate report. Please try again.');
+  }
 }
+

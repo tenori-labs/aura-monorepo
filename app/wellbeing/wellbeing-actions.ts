@@ -3,7 +3,7 @@
 import prisma from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { canAccessFacultyRoutes } from '@/lib/roles';
-import { isValidRevealReason } from './wellbeing-validation';
+import { isValidRevealReason, isValidWellbeingStatus } from './wellbeing-validation';
 
 /**
  * Retrieves all wellbeing reports for the dashboard, sorted by most recent first.
@@ -101,6 +101,10 @@ export async function updateReportStatus(reportId: string, status: string) {
 
   if (!user || !canAccessFacultyRoutes(user)) {
     throw new Error('Unauthorized');
+  }
+
+  if (!isValidWellbeingStatus(status)) {
+    throw new Error('Invalid status.');
   }
 
   await prisma.wellbeingReport.update({

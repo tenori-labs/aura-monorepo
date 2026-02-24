@@ -31,7 +31,7 @@ describe('cn', () => {
 
     // Type safety
     it('handles numeric input without crashing', () => {
-        expect(() => cn(123 as any)).not.toThrow();
+        expect(() => cn(123 as unknown as string)).not.toThrow();
     });
 
     it('handles object-only input', () => {
