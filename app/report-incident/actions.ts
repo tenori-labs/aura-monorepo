@@ -22,6 +22,10 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) {
+    return { error: 'You must be logged in to submit a report.' };
+  }
+
   // 2. Extract form data
   const type = formData.get('type') as string;
   const date = formData.get('date') as string;
