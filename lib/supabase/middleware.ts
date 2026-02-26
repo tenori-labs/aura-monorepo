@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   ADMIN_ONLY_ROUTES,
+  SHARED_ROUTES,
   FACULTY_ROUTES,
   ALL_PROTECTED_ROUTES,
   getDashboardPath,
@@ -60,8 +61,16 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    // 2. Block non-admins from admin-only routes
-    if (!isAdmin(user) && ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
+    // 2. Allow shared routes (e.g., /shadow/chat) before admin-only check
+    //    so sub-routes of admin paths aren't accidentally blocked
+    const isSharedRoute = SHARED_ROUTES.some((route) => pathname.startsWith(route));
+
+    // 3. Block non-admins from admin-only routes (unless it's a shared route)
+    if (
+      !isSharedRoute &&
+      !isAdmin(user) &&
+      ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route))
+    ) {
       const url = request.nextUrl.clone();
       // Redirect faculty to their dashboard, students to theirs
       url.pathname = getDashboardPath(user);
