@@ -63,7 +63,7 @@ export async function findNearestIssue(
  */
 export async function findNearestShadowCase(
     queryEmbedding: number[],
-    threshold = 0.90
+    threshold = 0.82
 ): Promise<VectorSearchResult | null> {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 

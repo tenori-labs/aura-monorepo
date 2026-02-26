@@ -139,10 +139,15 @@ async function handleShadowReport(
     text: string,
     shadowResult: { detectedNames: string[]; keywords: string[]; entityName: string }
 ) {
-    // Embed the entity name for case matching
-    const embedding = await embedText(shadowResult.entityName);
+    // Embed the entity name + keywords together for richer matching
+    // e.g. "A staff encouraging malpractice" instead of just "A staff"
+    const embeddingContext = [
+        shadowResult.entityName,
+        ...shadowResult.keywords,
+    ].join(' ');
+    const embedding = await embedText(embeddingContext);
 
-    // Search for existing ShadowCase about the same entity
+    // Search for existing ShadowCase about the same entity/action
     const { findNearestShadowCase } = await import('@/lib/ai/vector-search');
     const match = await findNearestShadowCase(embedding);
 
