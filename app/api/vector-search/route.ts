@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/vector-search
  *
  * Internal API route for Atlas Vector Search using the native MongoDB driver.
- * Prisma's aggregateRaw/$runCommandRaw silently return empty results for
- * $vectorSearch pipelines, so this uses the native driver instead.
+ * Requires an authenticated Supabase session.
  *
  * Body: { queryEmbedding: number[] }
  * Returns: { results: Array<{ _id, title, score }> }
  */
 export async function POST(req: NextRequest) {
     try {
+        // Auth guard
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { queryEmbedding } = await req.json();
 
         if (!queryEmbedding || !Array.isArray(queryEmbedding)) {

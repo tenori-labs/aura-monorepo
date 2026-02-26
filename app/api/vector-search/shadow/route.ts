@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/vector-search/shadow
  *
  * Internal API route for Atlas Vector Search on the ShadowCase collection.
- * Uses the native MongoDB driver to search for shadow cases by entity
- * name embedding.
+ * Requires an authenticated Supabase session.
  *
  * Body: { queryEmbedding: number[] }
  * Returns: { results: Array<{ _id, entityName, score }> }
  */
 export async function POST(req: NextRequest) {
     try {
+        // Auth guard
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { queryEmbedding } = await req.json();
 
         if (!queryEmbedding || !Array.isArray(queryEmbedding)) {
