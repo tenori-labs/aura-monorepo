@@ -1,3 +1,5 @@
+import { cookies } from 'next/headers';
+
 /**
  * Result of a vector search match against the CoreIssue collection.
  */
@@ -14,7 +16,7 @@ export interface VectorSearchResult {
  * because Prisma's aggregateRaw silently returns empty results for $vectorSearch.
  *
  * @param queryEmbedding - 3072-dim embedding vector from Gemini
- * @param threshold - Minimum cosine similarity score to consider a match (default 0.75)
+ * @param threshold - Minimum cosine similarity score to consider a match (default 0.88)
  * @returns The best matching CoreIssue above the threshold, or null if no match
  */
 export async function findNearestIssue(
@@ -22,10 +24,14 @@ export async function findNearestIssue(
     threshold = 0.88
 ): Promise<VectorSearchResult | null> {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const cookieStore = await cookies();
 
     const response = await fetch(`${baseUrl}/api/vector-search`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookieStore.toString(),
+        },
         body: JSON.stringify({ queryEmbedding }),
     });
 
@@ -58,7 +64,7 @@ export async function findNearestIssue(
  * collection by entity name embedding.
  *
  * @param queryEmbedding - 3072-dim embedding vector from Gemini
- * @param threshold - Minimum cosine similarity score to consider a match (default 0.75)
+ * @param threshold - Minimum cosine similarity score to consider a match (default 0.82)
  * @returns The best matching ShadowCase above the threshold, or null if no match
  */
 export async function findNearestShadowCase(
@@ -66,10 +72,14 @@ export async function findNearestShadowCase(
     threshold = 0.82
 ): Promise<VectorSearchResult | null> {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const cookieStore = await cookies();
 
     const response = await fetch(`${baseUrl}/api/vector-search/shadow`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            Cookie: cookieStore.toString(),
+        },
         body: JSON.stringify({ queryEmbedding }),
     });
 
@@ -94,3 +104,4 @@ export async function findNearestShadowCase(
         score: match.score,
     };
 }
+
