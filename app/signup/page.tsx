@@ -8,12 +8,13 @@ import { CheckIcon } from '@radix-ui/react-icons';
 import { Marker } from '@/components/Marker';
 import { Suspense, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Spinner } from '@/components/spinner';
 
 function SignupButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" formAction={signup} disabled={pending}>
-      {pending ? 'Creating account…' : 'Create account'}
+      {pending ? <><Spinner /> Creating account…</> : 'Create account'}
     </Button>
   );
 }

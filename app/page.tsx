@@ -6,12 +6,13 @@ import { login } from '@/app/auth/actions';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Spinner } from '@/components/spinner';
 
 function LoginButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" formAction={login} disabled={pending}>
-      {pending ? 'Signing in…' : 'Sign in'}
+      {pending ? <><Spinner /> Signing in…</> : 'Sign in'}
     </Button>
   );
 }

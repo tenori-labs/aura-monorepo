@@ -129,3 +129,8 @@
 @media (min-width: 641px) {
   .hide-on-desktop { display: none !important; }
 }
+
+/* Spinner animation for loading states */
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}

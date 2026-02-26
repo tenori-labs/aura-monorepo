@@ -6,6 +6,8 @@ import { PageFooter } from '@/components/page-footer';
 import { submitGrievance } from '../bulletin-actions';
 import { useActionState } from 'react';
 
+import { Spinner } from '@/components/spinner';
+
 /**
  * Form component for submitting anonymous grievances.
  * Uses React's useActionState for form state management.
@@ -59,7 +61,7 @@ function SubmitGrievanceForm() {
                     )}
 
                     <Button type="submit" size="3" disabled={isPending}>
-                        {isPending ? 'Submitting...' : 'Submit Grievance'}
+                        {isPending ? <><Spinner /> Submitting…</> : 'Submit Grievance'}
                     </Button>
                 </Flex>
             </form>
