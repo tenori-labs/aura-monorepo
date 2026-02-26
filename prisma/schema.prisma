@@ -100,4 +100,97 @@ model IdentityAccess {
   report     WellbeingReport @relation(fields: [reportId], references: [id])
 }
 
+// ─── Public Bulletin System ──────────────────────────────────────────
 
+/// Individual student grievance — text purged after CoreIssue promotion.
+model Grievance {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String                        // Supabase user ID (duplicate prevention)
+  text        String?                       // nullable — purged after promotion
+  coreIssueId String    @db.ObjectId
+  coreIssue   CoreIssue @relation(fields: [coreIssueId], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+/// AI-clustered group of similar grievances.
+/// `embedding` is a 768-dim vector from Gemini text-embedding-004,
+/// queried via MongoDB Atlas $vectorSearch for k-NN matching.
+model CoreIssue {
+  id          String                @id @default(auto()) @map("_id") @db.ObjectId
+  title       String                // AI-generated short title
+  summary     String                // AI-generated neutral summary
+  embedding   Float[]               // 768-dim Gemini embedding vector
+  uniqueCount Int       @default(1)
+  threshold   Int       @default(10)  // promotion threshold (configurable)
+  isPromoted  Boolean   @default(false)
+  promotedAt  DateTime?
+  status      String    @default("pending")
+  // status: "pending" | "acknowledged" | "investigating" | "resolved"
+  grievances  Grievance[]
+  responses   InstitutionResponse[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+/// Institution's public response to a promoted CoreIssue.
+/// Displayed with a "Verified Responder" badge on the bulletin board.
+model InstitutionResponse {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  coreIssueId String    @db.ObjectId
+  coreIssue   CoreIssue @relation(fields: [coreIssueId], references: [id])
+  responderId String    // admin Supabase user ID
+  message     String
+  newStatus   String    // status update (e.g., "investigating")
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Shadow Trigger System ───────────────────────────────────────────
+
+/// Private case docket — created when a grievance contains personal
+/// names/titles or safety keywords (harassment, abuse, assault).
+/// Only visible to admins. Groups reports about the same entity.
+model ShadowCase {
+  id            String                  @id @default(auto()) @map("_id") @db.ObjectId
+  entityName    String                  // the named person/entity being reported
+  embedding     Float[]                 // 3072-dim Gemini embedding for entity matching
+  reportCount   Int                     @default(1)
+  threshold     Int                     @default(10)  // auto-escalation threshold
+  status        String                  @default("collecting")
+  // status: "collecting" | "interrogating" | "escalated" | "flagged_collusion" | "closed"
+  vcScore       Float?                  // verification coefficient (calculated after interrogation)
+  vcDetails     Json?                   // { timeScores, locationScores, actionScores, witnessOverlap }
+  reports       ShadowReport[]
+  sessions      InterrogationSession[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+}
+
+/// Individual private report linked to a ShadowCase.
+/// Text is preserved (not purged) since these are private investigations.
+model ShadowReport {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String      // Supabase user ID (duplicate prevention + future chat sessions)
+  text          String      // original report text (preserved for investigation)
+  detectedNames String[]    // names/titles detected by the AI
+  keywords      String[]    // safety keywords found (e.g., "harassment", "abuse")
+  shadowCaseId  String      @db.ObjectId
+  shadowCase    ShadowCase  @relation(fields: [shadowCaseId], references: [id])
+  createdAt     DateTime    @default(now())
+}
+
+/// Individual interrogation chat session — one per reporter per shadow case.
+/// Chat history stored as JSON. AI extracts structured anchors after completion.
+model InterrogationSession {
+  id               String      @id @default(auto()) @map("_id") @db.ObjectId
+  shadowCaseId     String      @db.ObjectId
+  shadowCase       ShadowCase  @relation(fields: [shadowCaseId], references: [id])
+  userId           String      // reporter's Supabase user ID
+  status           String      @default("pending")
+  // status: "pending" | "in_progress" | "completed" | "expired"
+  chatHistory      Json        @default("[]")
+  // Array<{ role: 'user'|'model', content: string }>
+  extractedAnchors Json?       // { time, date, location, floor, room, witnesses[], eventDescription }
+  completedAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}

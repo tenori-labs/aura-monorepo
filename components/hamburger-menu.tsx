@@ -29,6 +29,21 @@ const allNavItems = [
     href: '/consent-form',
     roles: ['student', 'faculty', 'admin'] as UserRole[],
   },
+  {
+    label: 'Bulletin Board',
+    href: '/bulletin',
+    roles: ['student', 'faculty', 'admin'] as UserRole[],
+  },
+  {
+    label: 'Shadow Cases',
+    href: '/shadow',
+    roles: ['admin'] as UserRole[],
+  },
+  {
+    label: 'Pending Interview',
+    href: '/shadow/chat',
+    roles: ['student', 'faculty', 'admin'] as UserRole[],
+  },
 ];
 
 interface HamburgerMenuProps {
@@ -38,6 +53,7 @@ interface HamburgerMenuProps {
 export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<UserRole>(propRole || 'student');
+  const [pendingCount, setPendingCount] = useState(0);
   const pathname = usePathname();
 
   // Fetch role from Supabase if not passed as prop
@@ -54,6 +70,15 @@ export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
     });
   }, [propRole]);
 
+  // Fetch pending interview count
+  useEffect(() => {
+    import('@/app/shadow/chat/chat-actions').then(({ getPendingInterviewCount }) => {
+      getPendingInterviewCount().then((result) => {
+        if ('count' in result) setPendingCount(result.count);
+      });
+    });
+  }, [pathname]);
+
   const activeRole = propRole || role;
 
   // Filter nav items based on role
@@ -62,53 +87,79 @@ export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
   return (
     <Box>
       {/* Hamburger Button */}
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Open navigation menu"
-        style={{
-          background: 'none',
-          border: '1px solid var(--gray-a6)',
-          borderRadius: 'var(--radius-2)',
-          padding: '6px 8px',
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '36px',
-          height: '36px',
-          transition: 'background 0.15s',
-        }}
-      >
-        <span
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Open navigation menu"
           style={{
-            display: 'block',
-            width: '18px',
-            height: '2px',
-            background: 'var(--gray-12)',
-            borderRadius: '1px',
+            background: 'none',
+            border: '1px solid var(--gray-a6)',
+            borderRadius: 'var(--radius-2)',
+            padding: '6px 8px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '36px',
+            height: '36px',
+            transition: 'background 0.15s',
           }}
-        />
-        <span
-          style={{
-            display: 'block',
-            width: '18px',
-            height: '2px',
-            background: 'var(--gray-12)',
-            borderRadius: '1px',
-          }}
-        />
-        <span
-          style={{
-            display: 'block',
-            width: '18px',
-            height: '2px',
-            background: 'var(--gray-12)',
-            borderRadius: '1px',
-          }}
-        />
-      </button>
+        >
+          <span
+            style={{
+              display: 'block',
+              width: '18px',
+              height: '2px',
+              background: 'var(--gray-12)',
+              borderRadius: '1px',
+            }}
+          />
+          <span
+            style={{
+              display: 'block',
+              width: '18px',
+              height: '2px',
+              background: 'var(--gray-12)',
+              borderRadius: '1px',
+            }}
+          />
+          <span
+            style={{
+              display: 'block',
+              width: '18px',
+              height: '2px',
+              background: 'var(--gray-12)',
+              borderRadius: '1px',
+            }}
+          />
+        </button>
+        {/* Red notification dot */}
+        {pendingCount > 0 && (
+          <span
+            style={{
+              position: 'absolute',
+              top: '-2px',
+              right: '-2px',
+              width: pendingCount > 9 ? '18px' : '14px',
+              height: '14px',
+              borderRadius: '7px',
+              background: 'var(--red-9)',
+              border: '2px solid var(--color-background)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '9px',
+              fontWeight: 700,
+              color: 'white',
+              lineHeight: 1,
+            }}
+          >
+            {pendingCount}
+          </span>
+        )}
+      </div>
 
       {/* Slide-out Drawer & Backdrop */}
       {open && (
@@ -225,7 +276,24 @@ export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
                       if (!isActive) e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    {item.label}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {item.label}
+                      {item.href === '/shadow/chat' && pendingCount > 0 && (
+                        <span
+                          style={{
+                            background: 'var(--red-9)',
+                            color: 'white',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            borderRadius: '10px',
+                            padding: '1px 7px',
+                            lineHeight: '16px',
+                          }}
+                        >
+                          {pendingCount}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 );
               })}

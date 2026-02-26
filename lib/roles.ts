@@ -1,7 +1,7 @@
 export type UserRole = 'student' | 'faculty' | 'admin';
 
 /** Routes only accessible by admins */
-export const ADMIN_ONLY_ROUTES = Object.freeze(['/admin-dashboard', '/wellbeing']);
+export const ADMIN_ONLY_ROUTES = Object.freeze(['/admin-dashboard', '/wellbeing', '/shadow']);
 
 /** Routes accessible by faculty AND admins (but not students) */
 export const FACULTY_ROUTES = Object.freeze(['/faculty-dashboard']);
@@ -13,6 +13,8 @@ export const SHARED_ROUTES = Object.freeze([
   '/ai-assistant',
   '/consent-form',
   '/charts',
+  '/bulletin',
+  '/shadow/chat',
 ]);
 
 /** All protected routes (require login) */

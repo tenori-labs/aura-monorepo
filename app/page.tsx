@@ -5,6 +5,17 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { login } from '@/app/auth/actions';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { Spinner } from '@/components/spinner';
+
+function LoginButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" formAction={login} disabled={pending}>
+      {pending ? <><Spinner /> Signing in…</> : 'Sign in'}
+    </Button>
+  );
+}
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -162,9 +173,7 @@ function LoginForm() {
                 <Link href="/signup" size="2">
                   Create an account
                 </Link>
-                <Button type="submit" formAction={login}>
-                  Sign in
-                </Button>
+                <LoginButton />
               </Flex>
             </form>
           </Flex>

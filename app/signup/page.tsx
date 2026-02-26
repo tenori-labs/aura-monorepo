@@ -7,6 +7,17 @@ import { useSearchParams } from 'next/navigation';
 import { CheckIcon } from '@radix-ui/react-icons';
 import { Marker } from '@/components/Marker';
 import { Suspense, useState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { Spinner } from '@/components/spinner';
+
+function SignupButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" formAction={signup} disabled={pending}>
+      {pending ? <><Spinner /> Creating account…</> : 'Create account'}
+    </Button>
+  );
+}
 
 function SignupForm() {
   const searchParams = useSearchParams();
@@ -206,9 +217,7 @@ function SignupForm() {
                     <Link href="/" size="2">
                       Already have an account?
                     </Link>
-                    <Button type="submit" formAction={signup}>
-                      Create account
-                    </Button>
+                    <SignupButton />
                   </Flex>
                 </form>
               </Flex>
