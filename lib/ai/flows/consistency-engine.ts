@@ -4,7 +4,6 @@ import prisma from '@/lib/db';
 import { embedText } from '@/lib/ai/embedding';
 import type { ExtractedAnchors } from './interrogation-chat';
 import {
-    averagePairwiseSimilarity,
     cosineSimilarity,
 } from './similarity-utils';
 
@@ -61,10 +60,10 @@ export async function runConsistencyCheck(shadowCaseId: string): Promise<void> {
     }
 
     // Calculate each similarity component
-    const timeScore = calculateTimeSimilarity(anchors);
-    const locationScore = calculateLocationSimilarity(anchors);
+    const timeScore = await calculateTimeSimilarity(anchors);
+    const locationScore = await calculateLocationSimilarity(anchors);
     const actionScore = await calculateActionSimilarity(anchors);
-    const witnessOverlap = calculateWitnessOverlap(anchors);
+    const witnessOverlap = await calculateWitnessOverlap(anchors);
 
     // Vc = average of the three sub-scores
     const vc = (timeScore + locationScore + actionScore) / 3;
@@ -104,36 +103,68 @@ export async function runConsistencyCheck(shadowCaseId: string): Promise<void> {
 
 /**
  * Calculates average pairwise time similarity from extracted anchors.
- * Uses fuzzy string matching on time and date fields.
+ * Uses Gemini embeddings for semantic matching so that "11.30" and
+ * "around 11 am" are recognized as similar.
  *
  * @param anchors - Array of extracted anchor objects
- * @returns Average similarity score (0-1)
+ * @returns Average cosine similarity score (0-1)
  */
-function calculateTimeSimilarity(anchors: ExtractedAnchors[]): number {
-    const timeStrings = anchors.map((a) => {
-        const parts = [a.time, a.date].filter(Boolean);
-        return parts.join(' ').toLowerCase().trim();
-    });
+async function calculateTimeSimilarity(anchors: ExtractedAnchors[]): Promise<number> {
+    const timeStrings = anchors
+        .map((a) => {
+            const parts = [a.time, a.date].filter(Boolean);
+            return parts.join(' ').trim();
+        })
+        .filter((s) => s.length > 0);
 
-    return averagePairwiseSimilarity(timeStrings);
+    if (timeStrings.length < 2) return 0;
+
+    const embeddings = await Promise.all(timeStrings.map((s) => embedText(s)));
+
+    let totalSim = 0;
+    let pairCount = 0;
+    for (let i = 0; i < embeddings.length; i++) {
+        for (let j = i + 1; j < embeddings.length; j++) {
+            totalSim += cosineSimilarity(embeddings[i], embeddings[j]);
+            pairCount++;
+        }
+    }
+
+    return pairCount > 0 ? totalSim / pairCount : 0;
 }
 
 // ─── Location Similarity ─────────────────────────────────────────────
 
 /**
  * Calculates average pairwise location similarity from extracted anchors.
- * Combines location, floor, and room into a single string for matching.
+ * Uses Gemini embeddings for semantic matching so that "east block first floor"
+ * and "east block building first floor bathroom" are recognized as similar.
  *
  * @param anchors - Array of extracted anchor objects
- * @returns Average similarity score (0-1)
+ * @returns Average cosine similarity score (0-1)
  */
-function calculateLocationSimilarity(anchors: ExtractedAnchors[]): number {
-    const locationStrings = anchors.map((a) => {
-        const parts = [a.location, a.floor, a.room].filter(Boolean);
-        return parts.join(' ').toLowerCase().trim();
-    });
+async function calculateLocationSimilarity(anchors: ExtractedAnchors[]): Promise<number> {
+    const locationStrings = anchors
+        .map((a) => {
+            const parts = [a.location, a.floor, a.room].filter(Boolean);
+            return parts.join(' ').trim();
+        })
+        .filter((s) => s.length > 0);
 
-    return averagePairwiseSimilarity(locationStrings);
+    if (locationStrings.length < 2) return 0;
+
+    const embeddings = await Promise.all(locationStrings.map((s) => embedText(s)));
+
+    let totalSim = 0;
+    let pairCount = 0;
+    for (let i = 0; i < embeddings.length; i++) {
+        for (let j = i + 1; j < embeddings.length; j++) {
+            totalSim += cosineSimilarity(embeddings[i], embeddings[j]);
+            pairCount++;
+        }
+    }
+
+    return pairCount > 0 ? totalSim / pairCount : 0;
 }
 
 // ─── Action Similarity ───────────────────────────────────────────────
@@ -151,10 +182,8 @@ async function calculateActionSimilarity(anchors: ExtractedAnchors[]): Promise<n
 
     if (descriptions.length < 2) return 0;
 
-    // Embed all event descriptions
     const embeddings = await Promise.all(descriptions.map((d) => embedText(d)));
 
-    // Pairwise cosine similarity
     let totalSim = 0;
     let pairCount = 0;
     for (let i = 0; i < embeddings.length; i++) {
@@ -170,35 +199,59 @@ async function calculateActionSimilarity(anchors: ExtractedAnchors[]): Promise<n
 // ─── Witness Cross-Reference ─────────────────────────────────────────
 
 /**
- * Checks if witnesses mentioned by one reporter are themselves reporters
- * in the same case. Higher overlap increases confidence.
+ * Checks if witnesses mentioned across reports are similar using embeddings.
+ * Uses cosine similarity so "chris nikhil" and "Chris Nikhil" (or even
+ * partial names like "chris") are detected as cross-references.
+ *
+ * A match threshold of 0.80 is used to determine if two witness names
+ * refer to the same person.
  *
  * @param anchors - Array of extracted anchor objects
- * @param sessions - The interrogation sessions (for userId lookups)
  * @returns Witness overlap score (0-1)
  */
-function calculateWitnessOverlap(
+async function calculateWitnessOverlap(
     anchors: ExtractedAnchors[]
-): number {
-    // Collect all mentioned witnesses
-    const allWitnesses = anchors
-        .flatMap((a) => a.witnesses ?? [])
-        .map((w) => w.toLowerCase().trim())
-        .filter(Boolean);
+): Promise<number> {
+    // Collect witnesses per report
+    const witnessesPerReport = anchors
+        .map((a) => (a.witnesses ?? []).filter((w) => w.trim().length > 0))
+        .filter((arr) => arr.length > 0);
 
-    if (allWitnesses.length === 0) return 0;
+    if (witnessesPerReport.length < 2) return 0;
 
-    // Count unique mentions
-    const uniqueWitnesses = [...new Set(allWitnesses)];
+    // Flatten all witness names and embed them
+    const allWitnesses = witnessesPerReport.flat();
+    if (allWitnesses.length < 2) return 0;
 
-    // Count how many witnesses appear in multiple reports
-    let crossReferenced = 0;
-    for (const witness of uniqueWitnesses) {
-        const mentionCount = allWitnesses.filter((w) => w === witness).length;
-        if (mentionCount > 1) crossReferenced++;
+    const embeddings = await Promise.all(
+        allWitnesses.map((w) => embedText(w.toLowerCase().trim()))
+    );
+
+    // Build a map of which report each witness belongs to
+    const reportIndex: number[] = [];
+    for (let r = 0; r < witnessesPerReport.length; r++) {
+        for (let w = 0; w < witnessesPerReport[r].length; w++) {
+            reportIndex.push(r);
+        }
     }
 
-    return uniqueWitnesses.length > 0 ? crossReferenced / uniqueWitnesses.length : 0;
+    // Check for cross-report matches (similarity > 0.80)
+    const MATCH_THRESHOLD = 0.80;
+    let crossMatches = 0;
+    let crossPairs = 0;
+
+    for (let i = 0; i < allWitnesses.length; i++) {
+        for (let j = i + 1; j < allWitnesses.length; j++) {
+            // Only compare witnesses from different reports
+            if (reportIndex[i] !== reportIndex[j]) {
+                crossPairs++;
+                const sim = cosineSimilarity(embeddings[i], embeddings[j]);
+                if (sim >= MATCH_THRESHOLD) {
+                    crossMatches++;
+                }
+            }
+        }
+    }
+
+    return crossPairs > 0 ? crossMatches / crossPairs : 0;
 }
-
-
