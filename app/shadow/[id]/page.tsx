@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
 import { getUserRole } from '@/lib/roles';
 import { getShadowCaseDetail } from '../shadow-actions';
+import { DownloadRedReport } from './download-red-report';
 
 /**
  * Admin detail page for a single shadow case.
@@ -166,6 +167,11 @@ export default async function ShadowCaseDetailPage({
                             )}
                         </Flex>
                     </Card>
+                )}
+
+                {/* Download Red Report */}
+                {sc.vcScore !== null && sc.vcScore !== undefined && (
+                    <DownloadRedReport shadowCaseId={id} />
                 )}
 
                 {/* Individual Reports */}
