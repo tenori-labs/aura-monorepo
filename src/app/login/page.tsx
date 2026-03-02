@@ -1,7 +1,7 @@
 // src/app/login/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -43,7 +43,7 @@ const PREFILLED_COLLEGE_ID = 'student';
 const PREFILLED_PASSWORD = 'password';
 const PREFILLED_MOBILE = '1234567890';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -252,5 +252,23 @@ export default function LoginPage() {
         />
       </div>
     </div>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <div className="flex w-full min-h-screen items-center justify-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
