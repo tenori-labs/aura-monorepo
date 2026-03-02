@@ -10,6 +10,23 @@ export interface VectorSearchResult {
 }
 
 /**
+ * Adjusts the similarity threshold based on the length of the original text.
+ *
+ * Short text produces noisy embeddings with artificially high similarity,
+ * so we raise the threshold to avoid false positives. Long text has rich
+ * semantic signal, so we can afford to be more lenient.
+ *
+ * @param base - The default threshold
+ * @param textLength - Character count of the original text
+ * @returns Adjusted threshold, clamped to [0, 1]
+ */
+export function adaptiveThreshold(base: number, textLength: number): number {
+    if (textLength < 30) return Math.min(1, base + 0.06);
+    if (textLength > 80) return Math.max(0, base - 0.03);
+    return base;
+}
+
+/**
  * Finds the nearest CoreIssue to the query embedding using MongoDB Atlas $vectorSearch.
  *
  * Calls the /api/vector-search API route, which uses the native MongoDB driver
@@ -17,44 +34,55 @@ export interface VectorSearchResult {
  *
  * @param queryEmbedding - 3072-dim embedding vector from Gemini
  * @param threshold - Minimum cosine similarity score to consider a match (default 0.88)
+ * @param textLength - Optional character count of the original text for adaptive thresholding
  * @returns The best matching CoreIssue above the threshold, or null if no match
  */
 export async function findNearestIssue(
     queryEmbedding: number[],
-    threshold = 0.88
+    threshold = 0.88,
+    textLength?: number
 ): Promise<VectorSearchResult | null> {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const cookieStore = await cookies();
+    try {
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        const cookieStore = await cookies();
 
-    const response = await fetch(`${baseUrl}/api/vector-search`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Cookie: cookieStore.toString(),
-        },
-        body: JSON.stringify({ queryEmbedding }),
-    });
+        const effectiveThreshold = textLength != null
+            ? adaptiveThreshold(threshold, textLength)
+            : threshold;
 
-    if (!response.ok) {
-        console.error('[VectorSearch] API error:', response.status);
+        const response = await fetch(`${baseUrl}/api/vector-search`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookieStore.toString(),
+            },
+            body: JSON.stringify({ queryEmbedding }),
+        });
+
+        if (!response.ok) {
+            console.error('[VectorSearch] API error:', response.status);
+            return null;
+        }
+
+        const { results } = await response.json();
+        const match = results?.[0];
+
+        console.log(
+            '[VectorSearch] Match:',
+            match ? { title: match.title, score: match.score, threshold: effectiveThreshold } : 'NO MATCH'
+        );
+
+        if (!match || match.score < effectiveThreshold) return null;
+
+        return {
+            id: match._id?.toString() ?? match._id,
+            title: match.title,
+            score: match.score,
+        };
+    } catch (error) {
+        console.error('[VectorSearch] Network error:', error);
         return null;
     }
-
-    const { results } = await response.json();
-    const match = results?.[0];
-
-    console.log(
-        '[VectorSearch] Match:',
-        match ? { title: match.title, score: match.score } : 'NO MATCH'
-    );
-
-    if (!match || match.score < threshold) return null;
-
-    return {
-        id: match._id?.toString() ?? match._id,
-        title: match.title,
-        score: match.score,
-    };
 }
 
 /**
@@ -65,43 +93,54 @@ export async function findNearestIssue(
  *
  * @param queryEmbedding - 3072-dim embedding vector from Gemini
  * @param threshold - Minimum cosine similarity score to consider a match (default 0.82)
+ * @param textLength - Optional character count of the original text for adaptive thresholding
  * @returns The best matching ShadowCase above the threshold, or null if no match
  */
 export async function findNearestShadowCase(
     queryEmbedding: number[],
-    threshold = 0.82
+    threshold = 0.82,
+    textLength?: number
 ): Promise<VectorSearchResult | null> {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const cookieStore = await cookies();
+    try {
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        const cookieStore = await cookies();
 
-    const response = await fetch(`${baseUrl}/api/vector-search/shadow`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Cookie: cookieStore.toString(),
-        },
-        body: JSON.stringify({ queryEmbedding }),
-    });
+        const effectiveThreshold = textLength != null
+            ? adaptiveThreshold(threshold, textLength)
+            : threshold;
 
-    if (!response.ok) {
-        console.error('[VectorSearch Shadow] API error:', response.status);
+        const response = await fetch(`${baseUrl}/api/vector-search/shadow`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookieStore.toString(),
+            },
+            body: JSON.stringify({ queryEmbedding }),
+        });
+
+        if (!response.ok) {
+            console.error('[VectorSearch Shadow] API error:', response.status);
+            return null;
+        }
+
+        const { results } = await response.json();
+        const match = results?.[0];
+
+        console.log(
+            '[VectorSearch Shadow] Match:',
+            match ? { entity: match.entityName, score: match.score, threshold: effectiveThreshold } : 'NO MATCH'
+        );
+
+        if (!match || match.score < effectiveThreshold) return null;
+
+        return {
+            id: match._id?.toString() ?? match._id,
+            title: match.entityName ?? match.title ?? '',
+            score: match.score,
+        };
+    } catch (error) {
+        console.error('[VectorSearch Shadow] Network error:', error);
         return null;
     }
-
-    const { results } = await response.json();
-    const match = results?.[0];
-
-    console.log(
-        '[VectorSearch Shadow] Match:',
-        match ? { entity: match.entityName, score: match.score } : 'NO MATCH'
-    );
-
-    if (!match || match.score < threshold) return null;
-
-    return {
-        id: match._id?.toString() ?? match._id,
-        title: match.entityName ?? match.title ?? '',
-        score: match.score,
-    };
 }
 
