@@ -63,7 +63,7 @@ export async function submitGrievance(formData: FormData) {
         const embedding = await embedText(sanitizedText);
 
         // 6. k-NN search via Atlas Vector Search
-        const match = await findNearestIssue(embedding);
+        const match = await findNearestIssue(embedding, 0.88, sanitizedText.length);
 
         if (match) {
             // ── Matched an existing CoreIssue ──
@@ -139,17 +139,21 @@ async function handleShadowReport(
     text: string,
     shadowResult: { detectedNames: string[]; keywords: string[]; entityName: string }
 ) {
-    // Embed the entity name + keywords together for richer matching
-    // e.g. "A staff encouraging malpractice" instead of just "A staff"
+    // Build enriched embedding context for better semantic resolution.
+    // Short entity names (e.g., "A staff") produce noisy embeddings, so we
+    // pad with structured fields and the full report text for richer signal.
     const embeddingContext = [
-        shadowResult.entityName,
-        ...shadowResult.keywords,
-    ].join(' ');
+        `Entity: ${shadowResult.entityName}.`,
+        shadowResult.keywords.length > 0
+            ? `Action: ${shadowResult.keywords.join(', ')}.`
+            : '',
+        `Report: ${text}`,
+    ].filter(Boolean).join(' ');
     const embedding = await embedText(embeddingContext);
 
     // Search for existing ShadowCase about the same entity/action
     const { findNearestShadowCase } = await import('@/lib/ai/vector-search');
-    const match = await findNearestShadowCase(embedding);
+    const match = await findNearestShadowCase(embedding, 0.82, embeddingContext.length);
 
     if (match) {
         // Check duplicate
