@@ -86,21 +86,21 @@ export async function findNearestIssue(
 }
 
 /**
- * Finds the nearest ShadowCase to the query embedding using MongoDB Atlas $vectorSearch.
+ * Finds the nearest ShadowCases to the query embedding using MongoDB Atlas $vectorSearch.
  *
- * Calls the /api/vector-search/shadow API route for searching the ShadowCase
- * collection by entity name embedding.
+ * Returns ALL candidates above the threshold (up to 5), sorted by score descending.
+ * The caller is responsible for filtering by entity name.
  *
  * @param queryEmbedding - 3072-dim embedding vector from Gemini
  * @param threshold - Minimum cosine similarity score to consider a match (default 0.82)
  * @param textLength - Optional character count of the original text for adaptive thresholding
- * @returns The best matching ShadowCase above the threshold, or null if no match
+ * @returns Array of matching ShadowCases above the threshold
  */
-export async function findNearestShadowCase(
+export async function findNearestShadowCases(
     queryEmbedding: number[],
     threshold = 0.82,
     textLength?: number
-): Promise<VectorSearchResult | null> {
+): Promise<VectorSearchResult[]> {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const cookieStore = await cookies();
@@ -120,27 +120,37 @@ export async function findNearestShadowCase(
 
         if (!response.ok) {
             console.error('[VectorSearch Shadow] API error:', response.status);
-            return null;
+            return [];
         }
 
         const { results } = await response.json();
-        const match = results?.[0];
+        if (!results || !Array.isArray(results)) return [];
 
-        console.log(
-            '[VectorSearch Shadow] Match:',
-            match ? { entity: match.entityName, score: match.score, threshold: effectiveThreshold } : 'NO MATCH'
-        );
-
-        if (!match || match.score < effectiveThreshold) return null;
-
-        return {
-            id: match._id?.toString() ?? match._id,
-            title: match.entityName ?? match.title ?? '',
-            score: match.score,
-        };
+        // Filter by threshold and map to VectorSearchResult
+        return results
+            .filter((r: { score: number }) => r.score >= effectiveThreshold)
+            .map((r: { _id: { toString(): string }; entityName?: string; title?: string; score: number }) => ({
+                id: r._id?.toString() ?? r._id,
+                title: r.entityName ?? r.title ?? '',
+                score: r.score,
+            }));
     } catch (error) {
         console.error('[VectorSearch Shadow] Network error:', error);
-        return null;
+        return [];
     }
 }
+
+/**
+ * Finds the single nearest ShadowCase (backward compatibility).
+ * @deprecated Use findNearestShadowCases (plural) for entity-name-aware matching.
+ */
+export async function findNearestShadowCase(
+    queryEmbedding: number[],
+    threshold = 0.82,
+    textLength?: number
+): Promise<VectorSearchResult | null> {
+    const results = await findNearestShadowCases(queryEmbedding, threshold, textLength);
+    return results.length > 0 ? results[0] : null;
+}
+
 

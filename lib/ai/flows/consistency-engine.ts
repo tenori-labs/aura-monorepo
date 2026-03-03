@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { embedText } from '@/lib/ai/embedding';
+import { cachedEmbedText } from '@/lib/ai/embedding-cache';
 import type { ExtractedAnchors } from './interrogation-chat';
 import {
     cosineSimilarity,
@@ -119,7 +119,12 @@ async function calculateTimeSimilarity(anchors: ExtractedAnchors[]): Promise<num
 
     if (timeStrings.length < 2) return 0;
 
-    const embeddings = await Promise.all(timeStrings.map((s) => embedText(s)));
+    const results = await Promise.allSettled(timeStrings.map((s) => cachedEmbedText(s)));
+    const embeddings = results
+        .filter((r): r is PromiseFulfilledResult<number[]> => r.status === 'fulfilled')
+        .map((r) => r.value);
+
+    if (embeddings.length < 2) return 0;
 
     let totalSim = 0;
     let pairCount = 0;
@@ -153,7 +158,12 @@ async function calculateLocationSimilarity(anchors: ExtractedAnchors[]): Promise
 
     if (locationStrings.length < 2) return 0;
 
-    const embeddings = await Promise.all(locationStrings.map((s) => embedText(s)));
+    const results = await Promise.allSettled(locationStrings.map((s) => cachedEmbedText(s)));
+    const embeddings = results
+        .filter((r): r is PromiseFulfilledResult<number[]> => r.status === 'fulfilled')
+        .map((r) => r.value);
+
+    if (embeddings.length < 2) return 0;
 
     let totalSim = 0;
     let pairCount = 0;
@@ -182,7 +192,12 @@ async function calculateActionSimilarity(anchors: ExtractedAnchors[]): Promise<n
 
     if (descriptions.length < 2) return 0;
 
-    const embeddings = await Promise.all(descriptions.map((d) => embedText(d)));
+    const results = await Promise.allSettled(descriptions.map((d) => cachedEmbedText(d)));
+    const embeddings = results
+        .filter((r): r is PromiseFulfilledResult<number[]> => r.status === 'fulfilled')
+        .map((r) => r.value);
+
+    if (embeddings.length < 2) return 0;
 
     let totalSim = 0;
     let pairCount = 0;
@@ -223,9 +238,12 @@ async function calculateWitnessOverlap(
     const allWitnesses = witnessesPerReport.flat();
     if (allWitnesses.length < 2) return 0;
 
-    const embeddings = await Promise.all(
-        allWitnesses.map((w) => embedText(w.toLowerCase().trim()))
+    const results = await Promise.allSettled(
+        allWitnesses.map((w) => cachedEmbedText(w.toLowerCase().trim()))
     );
+    const embeddings = results
+        .filter((r): r is PromiseFulfilledResult<number[]> => r.status === 'fulfilled')
+        .map((r) => r.value);
 
     // Build a map of which report each witness belongs to
     const reportIndex: number[] = [];

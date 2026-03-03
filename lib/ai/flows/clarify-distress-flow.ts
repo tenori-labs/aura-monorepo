@@ -1,7 +1,7 @@
 'use server';
 
 import { ai } from '@/lib/ai/genkit';
-import { z } from 'zod';
+import { z } from 'genkit';
 
 const ClarifyInputSchema = z.object({
   originalMessage: z
@@ -75,7 +75,11 @@ In summary, write one neutral sentence describing the context for a wellbeing re
       clearPIISession(sessionId1);
       clearPIISession(sessionId2);
 
-      return output!;
+      if (!output) {
+        throw new Error('[ClarifyDistress] AI returned empty response');
+      }
+
+      return output;
     } catch (e: unknown) {
       clearPIISession(sessionId1);
       clearPIISession(sessionId2);

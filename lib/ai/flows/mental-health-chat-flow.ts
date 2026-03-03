@@ -1,7 +1,7 @@
 'use server';
 
 import { ai } from '@/lib/ai/genkit';
-import { z } from 'zod';
+import { z } from 'genkit';
 
 const ChatMessageSchema = z.object({
   role: z.enum(['user', 'model']),

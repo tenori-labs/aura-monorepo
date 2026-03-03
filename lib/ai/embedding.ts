@@ -11,9 +11,19 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY!);
  *
  * @param text - The text to embed (should be PII-filtered beforehand)
  * @returns A 3072-element float array representing the text's semantic position
+ * @throws Error if text is empty or embedding API call fails
  */
 export async function embedText(text: string): Promise<number[]> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-    const result = await model.embedContent(text);
-    return result.embedding.values;
+    if (!text || text.trim().length === 0) {
+        throw new Error('embedText: text must be a non-empty string');
+    }
+
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+        const result = await model.embedContent(text);
+        return result.embedding.values;
+    } catch (error) {
+        console.error('[Embedding] Failed to generate embedding:', error);
+        throw error;
+    }
 }

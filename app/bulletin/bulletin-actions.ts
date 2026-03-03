@@ -151,14 +151,26 @@ async function handleShadowReport(
     ].filter(Boolean).join(' ');
     const embedding = await embedText(embeddingContext);
 
-    // Search for existing ShadowCase about the same entity/action
-    const { findNearestShadowCase } = await import('@/lib/ai/vector-search');
-    const match = await findNearestShadowCase(embedding, 0.82, embeddingContext.length);
+    // Search for existing ShadowCases — returns up to 5 candidates above threshold.
+    // We iterate them and pick the first one whose entity name matches.
+    const { findNearestShadowCases } = await import('@/lib/ai/vector-search');
+    const { entityNamesMatch } = await import('@/lib/ai/entity-match');
+    const candidates = await findNearestShadowCases(embedding, 0.82, embeddingContext.length);
 
-    if (match) {
+    // Find the best candidate whose entity name matches the new report
+    let matchedCase: { id: string; title: string; score: number } | null = null;
+    for (const candidate of candidates) {
+        const isSameEntity = await entityNamesMatch(shadowResult.entityName, candidate.title);
+        if (isSameEntity) {
+            matchedCase = candidate;
+            break;
+        }
+    }
+
+    if (matchedCase) {
         // Check duplicate
         const existing = await prisma.shadowReport.findFirst({
-            where: { userId, shadowCaseId: match.id },
+            where: { userId, shadowCaseId: matchedCase.id },
         });
 
         if (existing) {
@@ -172,44 +184,55 @@ async function handleShadowReport(
                 text,
                 detectedNames: shadowResult.detectedNames,
                 keywords: shadowResult.keywords,
-                shadowCaseId: match.id,
+                shadowCaseId: matchedCase.id,
             },
         });
 
         const updated = await prisma.shadowCase.update({
-            where: { id: match.id },
+            where: { id: matchedCase.id },
             data: { reportCount: { increment: 1 } },
         });
 
         // Auto-trigger interrogation when threshold reached
         if (updated.reportCount >= updated.threshold && updated.status === 'collecting') {
             const { triggerInterrogation } = await import('@/app/shadow/shadow-actions');
-            await triggerInterrogation(match.id);
+            await triggerInterrogation(matchedCase.id);
         }
 
         return { success: true, isNew: false };
     } else {
-        // Create new ShadowCase
-        const shadowCase = await prisma.shadowCase.create({
-            data: {
-                entityName: shadowResult.entityName,
-                embedding,
-                reportCount: 1,
-            },
-        });
-
-        await prisma.shadowReport.create({
-            data: {
-                userId,
-                text,
-                detectedNames: shadowResult.detectedNames,
-                keywords: shadowResult.keywords,
-                shadowCaseId: shadowCase.id,
-            },
-        });
-
-        return { success: true, isNew: true };
+        return await createNewShadowCase(userId, text, shadowResult, embedding);
     }
+}
+
+/**
+ * Creates a new ShadowCase and links the first report to it.
+ */
+async function createNewShadowCase(
+    userId: string,
+    text: string,
+    shadowResult: { detectedNames: string[]; keywords: string[]; entityName: string },
+    embedding: number[]
+) {
+    const shadowCase = await prisma.shadowCase.create({
+        data: {
+            entityName: shadowResult.entityName,
+            embedding,
+            reportCount: 1,
+        },
+    });
+
+    await prisma.shadowReport.create({
+        data: {
+            userId,
+            text,
+            detectedNames: shadowResult.detectedNames,
+            keywords: shadowResult.keywords,
+            shadowCaseId: shadowCase.id,
+        },
+    });
+
+    return { success: true, isNew: true };
 }
 
 // ─── Promote Issue (internal) ────────────────────────────────────────

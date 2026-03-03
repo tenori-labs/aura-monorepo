@@ -87,25 +87,23 @@ export const classifyIncidentReport = ai.defineFlow(
     const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
     const [sanitizedText, sessionId] = filterPII(input.reportText);
 
-    console.log(
-      '[PII Filter] Original length:',
-      input.reportText.length,
-      '→ Sanitized:',
-      sanitizedText.length
-    );
+    try {
+      const { output } = await classifyIncidentReportPrompt({
+        ...input,
+        reportText: sanitizedText, // Send sanitized text to Gemini
+      });
 
-    const { output } = await classifyIncidentReportPrompt({
-      ...input,
-      reportText: sanitizedText, // Send sanitized text to Gemini
-    });
+      if (!output) {
+        throw new Error('[ClassifyIncident] AI returned empty response');
+      }
 
-    // --- PII Filter: reconstruct PII in keywords ---
-    const result = {
-      ...output!,
-      keywords: output!.keywords.map((kw: string) => reconstructPII(sessionId, kw)),
-    };
-
-    clearPIISession(sessionId);
-    return result;
+      // --- PII Filter: reconstruct PII in keywords ---
+      return {
+        ...output,
+        keywords: output.keywords.map((kw: string) => reconstructPII(sessionId, kw)),
+      };
+    } finally {
+      clearPIISession(sessionId);
+    }
   }
 );
