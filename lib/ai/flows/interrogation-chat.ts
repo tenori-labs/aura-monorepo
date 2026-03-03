@@ -1,7 +1,7 @@
 'use server';
 
 import { ai } from '@/lib/ai/genkit';
-import { z } from 'zod';
+import { z } from 'genkit';
 
 /**
  * Chat message schema for interrogation sessions.
@@ -119,5 +119,8 @@ export async function interrogationChat(
     input: InterrogationChatInput
 ): Promise<InterrogationChatOutput> {
     const { output } = await interrogationPrompt(input);
-    return output!;
+    if (!output) {
+        throw new Error('[InterrogationChat] AI returned empty response');
+    }
+    return output;
 }

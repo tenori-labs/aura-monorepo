@@ -14,7 +14,7 @@ import { validateRequiredFields, validateFileSize, validateDate } from './report
  * @returns An object containing either the `success` status and `aiAnalysis` result, or an `error` message.
  */
 export async function submitIncident(prevState: unknown, formData: FormData) {
-  console.log('Submit incident action called');
+
   const supabase = await createClient();
 
   // 1. Get current user (Supabase Auth only)
@@ -63,17 +63,14 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
   // 5. Call Genkit AI Flow
   let aiResult = null;
   try {
-    console.log('Calling AI Classification with:', {
-      descriptionLength: description?.length,
-      hasMedia: !!mediaBase64,
-    });
+
 
     aiResult = await classifyIncidentReport({
       reportText: description,
       media: mediaBase64,
     });
 
-    console.log('AI Result received:', JSON.stringify(aiResult, null, 2));
+
   } catch (error) {
     console.error('AI Classification Failed:', error);
   }
@@ -95,10 +92,7 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
 
   // 7. Save to MongoDB via Prisma
   try {
-    // Debug: Check the DATABASE_URL has a db name
-    const dbUrl = process.env.DATABASE_URL || 'NOT SET';
-    const masked = dbUrl.replace(/\/\/.*@/, '//***:***@');
-    console.log('DATABASE_URL (masked):', masked);
+
     const savedReport = await prisma.incidentReport.create({
       data: {
         userId: user?.id || null,
@@ -126,7 +120,7 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
       },
     });
 
-    console.log('Report saved to MongoDB:', savedReport.id);
+
 
     return {
       success: true,

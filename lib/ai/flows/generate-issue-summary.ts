@@ -68,17 +68,22 @@ export const generateIssueSummary = ai.defineFlow(
         const { filterPII, reconstructPII, clearPIISession } = await import('@/lib/ai/pii-filter');
         const [sanitizedText, sessionId] = filterPII(input.grievanceText);
 
-        const { output } = await generateIssueSummaryPrompt({
-            grievanceText: sanitizedText,
-        });
+        try {
+            const { output } = await generateIssueSummaryPrompt({
+                grievanceText: sanitizedText,
+            });
 
-        // Reconstruct PII in output fields (in case any leaked through)
-        const result = {
-            title: reconstructPII(sessionId, output!.title),
-            summary: reconstructPII(sessionId, output!.summary),
-        };
+            if (!output) {
+                throw new Error('generateIssueSummary: AI returned null output');
+            }
 
-        clearPIISession(sessionId);
-        return result;
+            // Reconstruct PII in output fields (in case any leaked through)
+            return {
+                title: reconstructPII(sessionId, output.title),
+                summary: reconstructPII(sessionId, output.summary),
+            };
+        } finally {
+            clearPIISession(sessionId);
+        }
     }
 );

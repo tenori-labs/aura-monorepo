@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit, getRequestIP } from '@/lib/rate-limit';
 
 /**
  * POST /api/vector-search/shadow
@@ -29,6 +30,20 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        if (queryEmbedding.length !== 3072) {
+            return NextResponse.json(
+                { error: 'queryEmbedding must have exactly 3072 dimensions' },
+                { status: 400 }
+            );
+        }
+
+        // Rate limit: 20 requests per minute per IP
+        const ip = getRequestIP(req.headers);
+        const { allowed } = rateLimit(ip);
+        if (!allowed) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
+
         const client = await clientPromise;
         const db = client.db('aura');
 
@@ -41,7 +56,7 @@ export async function POST(req: NextRequest) {
                         path: 'embedding',
                         queryVector: queryEmbedding,
                         numCandidates: 50,
-                        limit: 1,
+                        limit: 5,
                     },
                 },
                 {

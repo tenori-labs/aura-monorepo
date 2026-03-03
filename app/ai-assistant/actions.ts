@@ -3,6 +3,7 @@
 import prisma from '@/lib/db';
 import { generateNeutralReport } from '@/lib/ai/flows/generate-report-flow';
 import { clarifyDistress } from '@/lib/ai/flows/clarify-distress-flow';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * Uses AI to clarify whether a flagged message represents a genuine mental health distress.
@@ -15,6 +16,10 @@ export async function handleClarification(input: {
   originalMessage: string;
   studentClarification: string;
 }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
   try {
     return await clarifyDistress(input);
   } catch (error) {
@@ -38,6 +43,10 @@ export async function generateAndStoreReport(input: {
   uid: string;
 }) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Unauthorized');
+
     const { themes, clarificationSummary, studentName, uid } = input;
 
     // Generate structured report (themes-only, no names, no quotes)

@@ -88,6 +88,9 @@ export const detectShadowTrigger = ai.defineFlow(
     },
     async (input) => {
         const { output } = await shadowTriggerPrompt(input);
-        return output!;
+        if (!output) {
+            return { isShadow: false, detectedNames: [], keywords: [], entityName: '' };
+        }
+        return output;
     }
 );

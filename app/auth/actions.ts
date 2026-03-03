@@ -27,7 +27,6 @@ export async function login(formData: FormData) {
   revalidatePath('/', 'layout');
 
   // Redirect based on role
-  // Redirect based on role
   const role = authData.user?.app_metadata?.role || 'student';
   if (role === 'faculty') {
     redirect('/faculty-dashboard');
@@ -50,6 +49,10 @@ export async function signup(formData: FormData) {
   const password = formData.get('password') as string;
   const fullName = formData.get('fullName') as string;
   const role = (formData.get('role') as UserRole) || 'student';
+
+  if (!email || !password || !fullName) {
+    redirect('/signup?error=' + encodeURIComponent('Email, password, and full name are required.'));
+  }
 
   const { error } = await supabase.auth.signUp({
     email,
