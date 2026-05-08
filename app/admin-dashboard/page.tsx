@@ -1,32 +1,26 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Flex, Heading, Text } from '@radix-ui/themes';
 import { CategoryManager } from '@/components/category-manager';
 import { SlaConfigForm } from '@/components/sla-config';
 import { SlaBreachBanner } from '@/components/sla-breach-banner';
-import { getUserRole } from '@/lib/roles';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
+import { getCurrentUser } from '@/lib/auth/server';
 import { getSlaConfig } from './actions';
 import prisma from '@/lib/db';
 import { isIncidentBreached } from '@/lib/sla';
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient();
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Second layer of defense (middleware is first)
   if (!user) {
     redirect('/');
   }
 
-  const role = getUserRole(user);
-  if (role !== 'admin') {
+  if (user.role !== 'admin') {
     redirect('/dashboard');
   }
+  const role = user.role;
 
   // Load SLA + count org-wide breaches for the alert banner
   const [{ sla }, allIncidents] = await Promise.all([
@@ -55,7 +49,7 @@ export default async function AdminDashboardPage() {
     >
       <PageHeader
         title="Admin Dashboard"
-        subtitle={`Welcome, ${user.user_metadata?.full_name ?? user.email?.split('@')[0]}!`}
+        subtitle={`Welcome, ${user.fullName ?? user.email?.split('@')[0] ?? 'Admin'}!`}
         userRole={role}
       />
 

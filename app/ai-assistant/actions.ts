@@ -3,22 +3,29 @@
 import prisma from '@/lib/db';
 import { generateNeutralReport } from '@/lib/ai/flows/generate-report-flow';
 import { clarifyDistress } from '@/lib/ai/flows/clarify-distress-flow';
-import { createClient } from '@/lib/supabase/server';
+import { auth } from '@clerk/nextjs/server';
 
 /**
- * Uses AI to clarify whether a flagged message represents a genuine mental health distress.
- * Called from the client after student provides additional context.
- *
- * @param input - Object containing `originalMessage` leading to flag, and the `studentClarification` response
- * @returns Clarification result object outlining distress validity and summary, via Genkit flow
+ * Light auth check — only verifies the user is signed in. Avoids
+ * `currentUser()` (which makes a Clerk Backend API call and can fail
+ * with a `ClerkAPIResponseError` on network hiccups). Returns userId
+ * or throws.
+ */
+async function requireUserId(): Promise<string> {
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
+  return userId;
+}
+
+/**
+ * Uses AI to clarify whether a flagged message represents a genuine mental
+ * health distress.
  */
 export async function handleClarification(input: {
   originalMessage: string;
   studentClarification: string;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Unauthorized');
+  await requireUserId();
 
   try {
     return await clarifyDistress(input);
@@ -30,11 +37,6 @@ export async function handleClarification(input: {
 
 /**
  * Generates a neutral AI report and stores it in the database.
- * Triggers database creation, guaranteeing no PII in the generated report text.
- * Requires clarification sequence to have confirmed genuine distress beforehand.
- *
- * @param input - Contains extracted `themes`, `clarificationSummary`, user `uid`, and `studentName` (separated for safety)
- * @returns The newly created database record for the wellbeing report
  */
 export async function generateAndStoreReport(input: {
   themes: string[];
@@ -43,16 +45,12 @@ export async function generateAndStoreReport(input: {
   uid: string;
 }) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Unauthorized');
+    await requireUserId();
 
     const { themes, clarificationSummary, studentName, uid } = input;
 
-    // Generate structured report (themes-only, no names, no quotes)
     const structured = await generateNeutralReport(themes, clarificationSummary);
 
-    // Store in MongoDB with all structured fields
     const report = await prisma.wellbeingReport.create({
       data: {
         uid,
@@ -81,4 +79,3 @@ export async function generateAndStoreReport(input: {
     throw new Error('Failed to generate report. Please try again.');
   }
 }
-

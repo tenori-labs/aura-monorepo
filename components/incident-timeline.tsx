@@ -16,15 +16,15 @@ import {
 import { normalizeLegacyStatus } from '@/app/faculty-dashboard/incident-validation';
 
 const STAGES = [
-  { key: 'submitted', label: 'Submitted', icon: FileTextIcon, slaStage: null as const },
-  { key: 'acknowledged', label: 'Acknowledged', icon: HandIcon, slaStage: 'acknowledge' as const },
+  { key: 'submitted', label: 'Submitted', icon: FileTextIcon, slaStage: null },
+  { key: 'acknowledged', label: 'Acknowledged', icon: HandIcon, slaStage: 'acknowledge' },
   {
     key: 'investigating',
     label: 'Investigating',
     icon: MagnifyingGlassIcon,
-    slaStage: 'investigate' as const,
+    slaStage: 'investigate',
   },
-  { key: 'resolved', label: 'Resolved', icon: CheckCircledIcon, slaStage: 'resolve' as const },
+  { key: 'resolved', label: 'Resolved', icon: CheckCircledIcon, slaStage: 'resolve' },
 ] as const;
 
 const STAGE_INDEX: Record<string, number> = {

@@ -1,8 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { createClient } from '@/lib/supabase/server';
-import { canAccessFacultyRoutes } from '@/lib/roles';
+import { authorizeFaculty } from '@/lib/auth/guards';
 import {
   isValidStatus,
   isValidTransition,
@@ -15,14 +14,8 @@ import {
  * Sets the corresponding stage timestamp automatically.
  */
 export async function updateIncidentStatus(incidentId: string, newStatus: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || !canAccessFacultyRoutes(user)) {
-    return { error: 'Unauthorized' };
-  }
+  const auth = await authorizeFaculty();
+  if ('error' in auth) return auth;
 
   if (!isValidStatus(newStatus)) {
     return { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` };
@@ -96,14 +89,8 @@ export async function resolveIncident(incidentId: string) {
  * Updates faculty notes on an incident report.
  */
 export async function updateIncidentNotes(incidentId: string, notes: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || !canAccessFacultyRoutes(user)) {
-    return { error: 'Unauthorized' };
-  }
+  const auth = await authorizeFaculty();
+  if ('error' in auth) return auth;
 
   try {
     await prisma.incidentReport.update({

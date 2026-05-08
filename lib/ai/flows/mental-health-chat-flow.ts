@@ -36,7 +36,7 @@ const GenerationSchema = z.object({
   selfHarmSignal: z
     .boolean()
     .describe(
-      "Set to true if the student's message contains any language suggesting self-harm, self-injury, or suicidal ideation — even ambiguously."
+      "Set to true ONLY for explicit self-harm/suicidal language (e.g. 'I want to die', 'hurt myself', 'don't want to be here anymore', specific plans). Set to false for general sadness, frustration, stress, fatigue, or 'not doing well' — those are normal venting, not crisis."
     ),
   followUpQuestion: z
     .string()
@@ -89,21 +89,36 @@ In your JSON output, fill in the following fields based on your analysis of the 
 - cognitivePatterns: array of observed patterns like "Catastrophizing", "Rumination", "Self-criticism"
 - counselorNotes: brief notes about the conversation for the counselor
 
-SELF-HARM DETECTION:
-If the student's message contains any language suggesting self-harm, self-injury, or suicidal ideation — even ambiguously — set selfHarmSignal to true.
+SELF-HARM DETECTION (be precise — false positives undermine trust):
+Set selfHarmSignal to true ONLY when the student's message contains explicit, specific language about:
+- Wanting to die, end their life, or stop existing
+- Hurting themselves, cutting, or other self-injury
+- Having a plan, method, or means to harm themselves
+- Phrases like "I don't want to be here anymore", "I want to disappear forever", "no point in living"
 
-When selfHarmSignal is true:
-- Set followUpQuestion to a gentle, natural check-in that gives the student space to clarify. Do not mention reports, counselors, or alerts.
-- Example: "It sounds like things feel really heavy right now. Are you doing okay?"
+Set selfHarmSignal to FALSE for general emotional content, even when negative. The following must NOT trigger:
+- "I'm not doing well" / "I'm not okay" / "I had a bad day"
+- "I'm sad", "I'm tired", "I'm exhausted", "I feel hopeless about [a specific thing]"
+- "I'm stressed", "I'm anxious", "I'm overwhelmed"
+- "Things are heavy" / "It's been rough" / "I'm struggling"
+- Venting about academics, relationships, family, or work
+- Casual greetings, even bleak ones
+
+When in genuine doubt between an explicit indicator and general venting, choose FALSE — Aura's normal empathetic responses are appropriate for general distress.
+
+When selfHarmSignal is TRUE:
+- Set followUpQuestion to a gentle, natural check-in that gives the student space to clarify, in your OWN words. Do not mention reports, counselors, or alerts.
 - Keep it conversational. One sentence. Warm tone.
-- The followUpQuestion should ALSO be used as your responseText when selfHarmSignal is true.
+- DO NOT copy any example phrasing verbatim — write a fresh sentence each time.
+- The followUpQuestion should ALSO be used as your responseText.
 
-When selfHarmSignal is false:
+When selfHarmSignal is FALSE:
 - Set followUpQuestion to null/empty.
+- Respond normally with empathy, reflective listening, and open-ended questions per the rest of these instructions.
 
 CONVERSATION THEMES (REQUIRED when selfHarmSignal is true):
 Always extract conversationThemes — a list of general topics observed (e.g. "academic pressure", "social isolation", "family stress", "suicidal ideation", "hopelessness"). These are themes only, never verbatim quotes.
-When selfHarmSignal is true, you MUST provide at least one theme. Even for short messages, infer the theme from context (e.g. a message about ending things → ["suicidal ideation", "emotional distress"]). Never return an empty array when selfHarmSignal is true.
+When selfHarmSignal is true, you MUST provide at least one theme. Never return an empty array when selfHarmSignal is true.
 
 Your "responseText" field must contain your natural, empathetic, conversational reply to the student. It should NOT mention any internal analysis fields.
 `;

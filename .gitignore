@@ -41,3 +41,10 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# AI agent skills installed locally (per-developer; reproducible via `npx skills add ...`)
+/.agents/
+/skills-lock.json
+
+# Migration script outputs
+/migration-output/

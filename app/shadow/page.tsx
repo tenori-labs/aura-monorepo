@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import {
     Badge,
@@ -12,31 +11,24 @@ import {
 } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { getShadowCases } from './shadow-actions';
 import Link from 'next/link';
 
 /**
  * Admin-only shadow cases dashboard.
- *
- * Displays all private case dockets created by the Shadow Trigger system.
- * Each card shows the entity name, report count, safety keywords, and status.
- * Only accessible to users with the admin role.
  */
 export default async function ShadowCasesPage() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         redirect('/');
     }
 
-    const userRole = getUserRole(user);
-    if (userRole !== 'admin') {
+    if (user.role !== 'admin') {
         redirect('/dashboard');
     }
+    const userRole = user.role;
 
     const result = await getShadowCases();
 

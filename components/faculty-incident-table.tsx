@@ -190,11 +190,11 @@ export function FacultyIncidentTable({
         updateIncidentNotes(selected.id, notes),
       ]);
 
-      if (statusResult.error) {
+      if ('error' in statusResult) {
         setSaveMessage({ type: 'error', text: statusResult.error });
         return;
       }
-      if (notesResult.error) {
+      if ('error' in notesResult) {
         setSaveMessage({ type: 'error', text: notesResult.error });
         return;
       }
@@ -227,7 +227,7 @@ export function FacultyIncidentTable({
 
     try {
       const result = await updateIncidentNotes(selected.id, notes);
-      if (result.error) {
+      if ('error' in result) {
         setSaveMessage({ type: 'error', text: result.error });
         return;
       }

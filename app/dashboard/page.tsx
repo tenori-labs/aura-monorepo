@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Avatar, Box, Button, Card, Flex, Heading, Separator, Text } from '@radix-ui/themes';
 import prisma from '@/lib/db';
@@ -6,26 +5,34 @@ import Link from 'next/link';
 import { StudentIncidentDialog } from '@/components/student-incident-dialog';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { CheckCircledIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons';
 import { getSlaConfig } from '@/app/admin-dashboard/actions';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/');
   }
 
+  // /dashboard is the STUDENT dashboard. Send faculty/admin to their own.
+  // We only redirect when we have a CONFIRMED non-student role from Clerk's
+  // server-side user object (not the JWT). Combined with the middleware
+  // permitting unknown roles through, this stops the JWT-stale loop.
+  if (user.role === 'admin') {
+    redirect('/admin-dashboard');
+  }
+  if (user.role === 'faculty') {
+    redirect('/faculty-dashboard');
+  }
+
+  // role === 'student' — render normally.
   const email = user.email ?? 'No email';
-  const name = user.user_metadata?.full_name ?? user.user_metadata?.name ?? email.split('@')[0];
-  const avatarUrl = user.user_metadata?.avatar_url ?? '';
+  const name = user.fullName ?? email.split('@')[0];
+  const avatarUrl = user.imageUrl ?? '';
   const initials = name.charAt(0).toUpperCase();
-  const userRole = getUserRole(user);
+  const userRole = user.role;
 
   // Fetch real incidents from MongoDB for this user
   const incidents = await prisma.incidentReport.findMany({
@@ -59,7 +66,7 @@ export default async function DashboardPage() {
       }}
     >
       <PageHeader
-        title={`${userRole === 'faculty' ? 'Faculty' : 'Student'} Dashboard`}
+        title="Student Dashboard"
         subtitle={`Welcome, ${name}!`}
         userRole={userRole}
       />

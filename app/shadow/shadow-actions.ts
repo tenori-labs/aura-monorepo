@@ -1,8 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { createClient } from '@/lib/supabase/server';
-import { isAdmin } from '@/lib/roles';
+import { authorizeAdmin } from '@/lib/auth/guards';
 import { isValidShadowStatus, isValidCaseId } from './shadow-validation';
 
 // ─── Get Shadow Cases (Admin) ────────────────────────────────────────
@@ -14,14 +13,8 @@ import { isValidShadowStatus, isValidCaseId } from './shadow-validation';
  * @returns Array of shadow cases with report counts
  */
 export async function getShadowCases() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user || !isAdmin(user)) {
-        return { error: 'Unauthorized' };
-    }
+    const auth = await authorizeAdmin();
+    if ('error' in auth) return auth;
 
     const cases = await prisma.shadowCase.findMany({
         orderBy: { updatedAt: 'desc' },
@@ -53,14 +46,8 @@ export async function getShadowCases() {
  * @returns The shadow case with embedded reports, or an error
  */
 export async function getShadowCaseDetail(caseId: string) {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user || !isAdmin(user)) {
-        return { error: 'Unauthorized' };
-    }
+    const auth = await authorizeAdmin();
+    if ('error' in auth) return auth;
 
     if (!isValidCaseId(caseId)) {
         return { error: 'Invalid case ID.' };
@@ -101,14 +88,8 @@ export async function getShadowCaseDetail(caseId: string) {
  * @returns Success/error result
  */
 export async function updateShadowCaseStatus(caseId: string, newStatus: string) {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user || !isAdmin(user)) {
-        return { error: 'Unauthorized' };
-    }
+    const auth = await authorizeAdmin();
+    if ('error' in auth) return auth;
 
     if (!isValidCaseId(caseId)) {
         return { error: 'Invalid case ID.' };

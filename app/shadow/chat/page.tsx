@@ -1,9 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Flex, Text } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { getActiveSession } from './chat-actions';
 import { InterrogationChat } from '@/components/interrogation-chat';
 
@@ -15,16 +14,13 @@ import { InterrogationChat } from '@/components/interrogation-chat';
  * The chat is isolated — reporters cannot see other sessions.
  */
 export default async function InterrogationChatPage() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         redirect('/');
     }
 
-    const userRole = getUserRole(user);
+    const userRole = user.role;
     const result = await getActiveSession();
 
     if ('error' in result) {

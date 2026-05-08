@@ -1,23 +1,19 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Flex } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
 import { AuraChat } from '@/components/aura-chat';
+import { getCurrentUser } from '@/lib/auth/server';
 
 export default async function AIAssistantPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/');
   }
 
   const email = user.email ?? 'No email';
-  const name = user.user_metadata?.full_name ?? user.user_metadata?.name ?? email.split('@')[0];
+  const name = user.fullName ?? email.split('@')[0];
 
   return (
     <div

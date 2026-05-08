@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { createClient } from '@/lib/supabase/server';
+import { auth } from '@clerk/nextjs/server';
 import { rateLimit, getRequestIP } from '@/lib/rate-limit';
 
 /**
@@ -15,9 +15,8 @@ import { rateLimit, getRequestIP } from '@/lib/rate-limit';
 export async function POST(req: NextRequest) {
     try {
         // Auth guard
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 

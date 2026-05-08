@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/server';
 import { classifyIncidentReport } from '@/lib/ai/flows/classify-incident-report';
 import prisma from '@/lib/db';
 import { validateRequiredFields, validateFileSize, validateDate } from './report-validation';
@@ -8,25 +8,13 @@ import { validateRequiredFields, validateFileSize, validateDate } from './report
 /**
  * Submit a new incident report from the student portal.
  * Handles form validation, file uploads, AI classification, and database storage.
- *
- * @param prevState - The previous state of the form action.
- * @param formData - The submitted form payload containing incident details and media.
- * @returns An object containing either the `success` status and `aiAnalysis` result, or an `error` message.
  */
 export async function submitIncident(prevState: unknown, formData: FormData) {
-
-  const supabase = await createClient();
-
-  // 1. Get current user (Supabase Auth only)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getCurrentUser();
   if (!user) {
     return { error: 'You must be logged in to submit a report.' };
   }
 
-  // 2. Extract form data
   const type = formData.get('type') as string;
   const date = formData.get('date') as string;
   const location = formData.get('location') as string;
@@ -34,7 +22,6 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
   const email = formData.get('email') as string;
   const file = formData.get('media') as File;
 
-  // 3. Validation
   if (!validateRequiredFields({ type, date, location, description })) {
     return { error: 'Please fill in all required fields.' };
   }
@@ -47,7 +34,6 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
     return { error: 'File size must be under 5MB.' };
   }
 
-  // 4. Convert file to base64 for AI + MongoDB storage
   let mediaBase64: string | undefined = undefined;
   let mediaType: string | undefined = undefined;
   let mediaFileName: string | undefined = undefined;
@@ -60,22 +46,16 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
     mediaFileName = file.name;
   }
 
-  // 5. Call Genkit AI Flow
   let aiResult = null;
   try {
-
-
     aiResult = await classifyIncidentReport({
       reportText: description,
       media: mediaBase64,
     });
-
-
   } catch (error) {
     console.error('AI Classification Failed:', error);
   }
 
-  // 6. Lookup category assignment for auto-assign
   let assignedTo: string | null = null;
   let assignedToEmail: string | null = null;
   try {
@@ -90,13 +70,11 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
     console.error('Category assignment lookup failed:', lookupError);
   }
 
-  // 7. Save to MongoDB via Prisma
   try {
-
     const savedReport = await prisma.incidentReport.create({
       data: {
-        userId: user?.id || null,
-        userEmail: user?.email || null,
+        userId: user.id,
+        userEmail: user.email,
         incidentType: type,
         dateTime: new Date(date),
         location,
@@ -107,20 +85,18 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
         mediaFileName,
         aiAnalysis: aiResult
           ? {
-            category: aiResult.category,
-            confidence: aiResult.confidence,
-            keywords: aiResult.keywords,
-            validity: aiResult.validity,
-            validityReason: aiResult.validityReason,
-          }
+              category: aiResult.category,
+              confidence: aiResult.confidence,
+              keywords: aiResult.keywords,
+              validity: aiResult.validity,
+              validityReason: aiResult.validityReason,
+            }
           : undefined,
         status: 'submitted',
         assignedTo,
         assignedToEmail,
       },
     });
-
-
 
     return {
       success: true,

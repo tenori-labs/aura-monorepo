@@ -48,7 +48,7 @@ export function SlaConfigForm() {
     }
 
     const result = await updateSlaConfig(sla);
-    if (result.error) {
+    if ('error' in result) {
       setMessage({ type: 'error', text: result.error });
     } else {
       setMessage({ type: 'success', text: 'SLA configuration saved.' });

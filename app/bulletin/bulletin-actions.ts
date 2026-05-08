@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/server';
 import { isAdmin } from '@/lib/roles';
 import { isValidGrievance, isValidIssueStatus } from './bulletin-validation';
 import { embedText } from '@/lib/ai/embedding';
@@ -30,10 +30,7 @@ import { generateIssueSummary } from '@/lib/ai/flows/generate-issue-summary';
  */
 export async function submitGrievance(formData: FormData) {
     // 1. Auth
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         return { error: 'You must be logged in to submit a grievance.' };
@@ -264,10 +261,7 @@ async function promoteIssue(coreIssueId: string) {
  * Accessible by all authenticated users.
  */
 export async function getPublicIssues() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         throw new Error('Unauthorized');
@@ -298,10 +292,7 @@ export async function getPublicIssues() {
  * Used for the notification badge on the bulletin nav link.
  */
 export async function getPendingCount() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         return { count: 0 };
@@ -326,10 +317,7 @@ export async function getPendingCount() {
  * @param newStatus - The updated status (acknowledged, investigating, resolved)
  */
 export async function respondToIssue(issueId: string, message: string, newStatus: string) {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user || !isAdmin(user)) {
         return { error: 'Only administrators can respond to issues.' };
@@ -372,10 +360,7 @@ export async function respondToIssue(issueId: string, message: string, newStatus
  * Includes all institution responses in chronological order.
  */
 export async function getIssueTimeline(issueId: string) {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         throw new Error('Unauthorized');

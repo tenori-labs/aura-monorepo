@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Avatar, Badge, Card, Flex, Heading, Separator, Text } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
@@ -6,19 +5,15 @@ import { PageFooter } from '@/components/page-footer';
 import { FacultyIncidentTable } from '@/components/faculty-incident-table';
 import { SlaBreachBanner } from '@/components/sla-breach-banner';
 import prisma from '@/lib/db';
-import { getUserRole, canAccessFacultyRoutes } from '@/lib/roles';
+import { canAccessFacultyRoutes } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { getSlaConfig } from '@/app/admin-dashboard/actions';
 import { isIncidentBreached } from '@/lib/sla';
 import { normalizeLegacyStatus } from '@/app/faculty-dashboard/incident-validation';
 
 export default async function FacultyDashboardPage() {
-  const supabase = await createClient();
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Second layer of defense (middleware is first)
   if (!user) {
     redirect('/');
   }
@@ -27,15 +22,15 @@ export default async function FacultyDashboardPage() {
     redirect('/dashboard');
   }
 
-  const role = getUserRole(user);
-
   // Admins have their own dashboard
-  if (role === 'admin') {
+  if (user.role === 'admin') {
     redirect('/admin-dashboard');
   }
+
+  const role = user.role;
   const email = user.email ?? 'No email';
-  const name = user.user_metadata?.full_name ?? user.user_metadata?.name ?? email.split('@')[0];
-  const avatarUrl = user.user_metadata?.avatar_url ?? '';
+  const name = user.fullName ?? email.split('@')[0];
+  const avatarUrl = user.imageUrl ?? '';
   const initials = name.charAt(0).toUpperCase();
 
   // Look up which categories this faculty is assigned to
