@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import {
     Badge,
@@ -15,7 +14,7 @@ import {
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { getPublicIssues, getPendingCount } from './bulletin-actions';
 import { BulletinResponseForm } from '@/components/bulletin-response-form';
 
@@ -27,16 +26,13 @@ import { BulletinResponseForm } from '@/components/bulletin-response-form';
  * Fetches fresh data on every request via force-dynamic.
  */
 export default async function BulletinPage() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         redirect('/');
     }
 
-    const userRole = getUserRole(user);
+    const userRole = user.role;
     const isUserAdmin = userRole === 'admin';
     const [issues, { count: pendingCount }] = await Promise.all([
         getPublicIssues(),

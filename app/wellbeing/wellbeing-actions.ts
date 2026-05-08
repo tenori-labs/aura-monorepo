@@ -1,25 +1,16 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { createClient } from '@/lib/supabase/server';
-import { canAccessFacultyRoutes } from '@/lib/roles';
+import { authorizeFaculty } from '@/lib/auth/guards';
 import { isValidRevealReason, isValidWellbeingStatus } from './wellbeing-validation';
 
 /**
  * Retrieves all wellbeing reports for the dashboard, sorted by most recent first.
- * Requires faculty authorization and strips student names from initial payload for safety.
- *
- * @returns Array of mapped wellbeing report objects omitting studentName, or throws Error if unauthorized
+ * Strips student names from initial payload for safety.
  */
 export async function getWellbeingReports() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || !canAccessFacultyRoutes(user)) {
-    throw new Error('Unauthorized');
-  }
+  const auth = await authorizeFaculty();
+  if ('error' in auth) throw new Error(auth.error);
 
   const reports = await prisma.wellbeingReport.findMany({
     orderBy: { generatedAt: 'desc' },
@@ -30,13 +21,10 @@ export async function getWellbeingReports() {
     },
   });
 
-  // Strip studentName from the initial fetch for safety
-  // Only return it via revealIdentity
   return reports.map((r) => ({
     ...r,
-    studentName: undefined, // Hide by default
+    studentName: undefined,
     accessCount: r._count.accessLog,
-    // Structured fields pass through as-is
     riskLevel: r.riskLevel,
     summary: r.summary,
     observedBehaviors: r.observedBehaviors,
@@ -46,28 +34,17 @@ export async function getWellbeingReports() {
 }
 
 /**
- * Reveals the identity of a student for a specific wellbeing report.
- * Requires faculty authorization, valid reason, and logs access securely in the database.
- *
- * @param reportId - Unique ID of the wellbeing report to reveal
- * @param reason - Justification string of at least 5 characters for accessing sensitive PI data
- * @returns Object containing the studentName and uid, or throws Error if unauthorized or parameters invalid
+ * Reveals the identity of a student for a specific wellbeing report. Logs access.
  */
 export async function revealIdentity(reportId: string, reason: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || !canAccessFacultyRoutes(user)) {
-    throw new Error('Unauthorized');
-  }
+  const auth = await authorizeFaculty();
+  if ('error' in auth) throw new Error(auth.error);
+  const { user } = auth;
 
   if (!isValidRevealReason(reason)) {
     throw new Error('A valid reason is required to reveal identity.');
   }
 
-  // Log the access
   await prisma.identityAccess.create({
     data: {
       reportId,
@@ -76,7 +53,6 @@ export async function revealIdentity(reportId: string, reason: string) {
     },
   });
 
-  // Fetch and return the name
   const report = await prisma.wellbeingReport.findUnique({
     where: { id: reportId },
     select: { studentName: true, uid: true },
@@ -87,21 +63,10 @@ export async function revealIdentity(reportId: string, reason: string) {
 
 /**
  * Updates the status of a wellbeing report.
- * Requires faculty authorization and performs a database update.
- *
- * @param reportId - Unique ID of the wellbeing report
- * @param status - New status string to be set for the report
- * @returns { success: true } when update succeeds, or throws Error if unauthorized
  */
 export async function updateReportStatus(reportId: string, status: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || !canAccessFacultyRoutes(user)) {
-    throw new Error('Unauthorized');
-  }
+  const auth = await authorizeFaculty();
+  if ('error' in auth) throw new Error(auth.error);
 
   if (!isValidWellbeingStatus(status)) {
     throw new Error('Invalid status.');
@@ -116,21 +81,11 @@ export async function updateReportStatus(reportId: string, status: string) {
 }
 
 /**
- * Generates a safe, name-free text snapshot of a wellbeing report for external counselor sharing.
- * Requires faculty authorization. Does not mutate the original database record.
- *
- * @param reportId - Unique ID of the wellbeing report to format
- * @returns { text: string } Cleaned counselor-friendly report string, or throws Error if unauthorized
+ * Generates a counselor-friendly text snapshot of a wellbeing report.
  */
 export async function generateCounselorReport(reportId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || !canAccessFacultyRoutes(user)) {
-    throw new Error('Unauthorized');
-  }
+  const auth = await authorizeFaculty();
+  if ('error' in auth) throw new Error(auth.error);
 
   const report = await prisma.wellbeingReport.findUnique({
     where: { id: reportId },
@@ -144,7 +99,6 @@ export async function generateCounselorReport(reportId: string) {
     day: 'numeric',
   });
 
-  // Build the snapshot in sections matching the UI layout
   const lines: string[] = [];
 
   lines.push('╔══════════════════════════════════════════════════╗');
@@ -157,13 +111,11 @@ export async function generateCounselorReport(reportId: string) {
   lines.push(`  Risk Level:  ${(report.riskLevel || 'UNKNOWN').toUpperCase()}`);
   lines.push('');
 
-  // ─── Summary ───
   lines.push('── SUMMARY ──────────────────────────────────────');
   lines.push('');
   lines.push(`  ${report.summary || report.reportText}`);
   lines.push('');
 
-  // ─── Observed Behaviors ───
   if (report.observedBehaviors && report.observedBehaviors.length > 0) {
     lines.push('── OBSERVED BEHAVIORS ───────────────────────────');
     lines.push('');
@@ -173,7 +125,6 @@ export async function generateCounselorReport(reportId: string) {
     lines.push('');
   }
 
-  // ─── Themes ───
   if (report.themes.length > 0) {
     lines.push('── THEMES ──────────────────────────────────────');
     lines.push('');
@@ -181,7 +132,6 @@ export async function generateCounselorReport(reportId: string) {
     lines.push('');
   }
 
-  // ─── Recommended Actions ───
   if (report.recommendedActions && report.recommendedActions.length > 0) {
     lines.push('── RECOMMENDED ACTIONS ─────────────────────────');
     lines.push('');
@@ -191,7 +141,6 @@ export async function generateCounselorReport(reportId: string) {
     lines.push('');
   }
 
-  // ─── Context Notes ───
   if (report.contextNotes) {
     lines.push('── CONTEXT NOTES ──────────────────────────────');
     lines.push('');
@@ -208,7 +157,6 @@ export async function generateCounselorReport(reportId: string) {
 
   const snapshot = lines.join('\n');
 
-  // Automatically update status to 'passed_on' if it was pending
   if (report.status === 'pending') {
     await prisma.wellbeingReport.update({
       where: { id: reportId },

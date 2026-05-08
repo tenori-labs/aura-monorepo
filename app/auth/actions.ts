@@ -1,84 +1,77 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import type { UserRole } from '@/lib/roles';
 
-/**
- * Authenticate an existing user and redirect them to their respective dashboard based on their role.
- *
- * @param formData - The login form data containing `email` and `password`.
- */
-export async function login(formData: FormData) {
-  const supabase = await createClient();
-
-  const data = {
-    email: formData.get('email') as string,
-    password: formData.get('password') as string,
-  };
-
-  const { error, data: authData } = await supabase.auth.signInWithPassword(data);
-
-  if (error) {
-    redirect(`/?error=${encodeURIComponent(error.message)}`);
-  }
-
-  revalidatePath('/', 'layout');
-
-  // Redirect based on role
-  const role = authData.user?.app_metadata?.role || 'student';
-  if (role === 'faculty') {
-    redirect('/faculty-dashboard');
-  } else if (role === 'admin') {
-    redirect('/admin-dashboard');
-  } else {
-    redirect('/dashboard');
-  }
-}
+const ALLOWED_ROLES: readonly UserRole[] = ['student', 'faculty', 'admin'];
 
 /**
- * Register a new user account via Supabase Authentication.
- *
- * @param formData - The registration form data containing `email`, `password`, `fullName`, and `role`.
+ * Sign-out fallback for any code paths still posting to `/auth/actions`.
+ * Sign-out is normally performed client-side via `useClerk().signOut()`
+ * or Clerk's `<SignOutButton>`.
  */
-export async function signup(formData: FormData) {
-  const supabase = await createClient();
-
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
-  const fullName = formData.get('fullName') as string;
-  const role = (formData.get('role') as UserRole) || 'student';
-
-  if (!email || !password || !fullName) {
-    redirect('/signup?error=' + encodeURIComponent('Email, password, and full name are required.'));
+export async function signout(): Promise<never> {
+  const { sessionId } = await auth();
+  if (sessionId) {
+    const client = await clerkClient();
+    try {
+      await client.sessions.revokeSession(sessionId);
+    } catch (err) {
+      console.error('Failed to revoke Clerk session:', err);
+    }
   }
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        role,
-        full_name: fullName,
-      },
-    },
-  });
-
-  if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
-  }
-
-  revalidatePath('/', 'layout');
-  redirect('/signup?message=Check your email to confirm your account');
-}
-
-/**
- * Clear the current user's session and redirect them to the home page.
- */
-export async function signout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  revalidatePath('/', 'layout');
   redirect('/');
+}
+
+/**
+ * Sets the role on the currently signed-in Clerk user.
+ *
+ * Called from the signup page right after `signUp.finalize()` so the role
+ * the user picked at sign-up time is immediately written to
+ * `publicMetadata.role` server-side. Idempotent: if a role is already set,
+ * we leave it alone (prevents accidental overwrites on signin or refresh).
+ *
+ * Security: only the AUTHENTICATED user (the one who just signed up) can
+ * set their own role, and only to a value in the allowlist. Existing roles
+ * are never overwritten.
+ */
+export async function setMyRoleAfterSignup(role: string) {
+  const { userId } = await auth();
+  console.log('[setMyRoleAfterSignup] called with role=', role, 'userId=', userId);
+
+  if (!userId) {
+    console.warn('[setMyRoleAfterSignup] No userId from auth() — auth context missing');
+    return { error: 'Unauthorized' };
+  }
+
+  if (!(ALLOWED_ROLES as readonly string[]).includes(role)) {
+    console.warn('[setMyRoleAfterSignup] Invalid role:', role);
+    return { error: `Invalid role: ${role}` };
+  }
+
+  const client = await clerkClient();
+
+  try {
+    const user = await client.users.getUser(userId);
+    console.log(
+      '[setMyRoleAfterSignup] current publicMetadata for',
+      userId,
+      '=',
+      user.publicMetadata
+    );
+    if (typeof user.publicMetadata?.role === 'string') {
+      console.log('[setMyRoleAfterSignup] Already set — leaving alone');
+      return { success: true, alreadySet: true };
+    }
+
+    await client.users.updateUser(userId, {
+      publicMetadata: { ...user.publicMetadata, role },
+    });
+    console.log(`[setMyRoleAfterSignup] Set publicMetadata.role=${role} for ${userId}`);
+    return { success: true };
+  } catch (err) {
+    console.error('[setMyRoleAfterSignup] Failed:', err);
+    return { error: 'Failed to set role.' };
+  }
 }

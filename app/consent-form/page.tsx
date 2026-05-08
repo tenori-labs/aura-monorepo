@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import {
   Container,
@@ -13,30 +12,26 @@ import {
 } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { ConsentForm } from '@/components/consent-form';
 import prisma from '@/lib/db';
 import { CheckCircledIcon, DownloadIcon } from '@radix-ui/react-icons';
 import Link from 'next/link';
 
 export default async function ConsentFormPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/');
   }
 
-  const role = getUserRole(user);
+  const role = user.role;
 
   // Get user details
-  const fullName = user.user_metadata?.full_name ?? user.email?.split('@')[0];
-  // In a real app, studentId/course would come from a profile table or SIS integration
-  // For now we'll simulate or leave empty
-  const studentId = user.user_metadata?.student_id || '';
-  const course = user.user_metadata?.course || '';
+  const fullName = user.fullName ?? user.email?.split('@')[0] ?? '';
+  // studentId / course would come from a profile table or SIS integration; left blank for now
+  const studentId = (user.publicMetadata?.studentId as string | undefined) ?? '';
+  const course = (user.publicMetadata?.course as string | undefined) ?? '';
 
   // Check if user has already signed
   const existingConsent = await prisma.consentRecord.findFirst({

@@ -40,6 +40,20 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
     originalMessage: string;
   } | null>(null);
 
+  // After a confirmed crisis, prevent the LLM from re-asking the same check-in
+  // question. The wellbeing report has already been logged silently for staff;
+  // Aura continues with normal supportive conversation from here.
+  const [postCrisis, setPostCrisis] = useState(false);
+
+  // Hardcoded empathetic replies — used to break LLM loops in safety-adjacent
+  // turns. Deliberately do NOT mention helplines, reports, or counsellors.
+  const POST_CONFIRMATION_REPLY =
+    "Thank you for telling me — that takes a lot. What you're carrying sounds really heavy, and I'm here with you. Would you like to share more about what's been weighing on you?";
+  const POST_FALSE_POSITIVE_REPLY =
+    "Thank you for clarifying. I just wanted to make sure you were okay. I'm here whenever you'd like to talk — what's been on your mind?";
+  const POST_CRISIS_FALLBACK_REPLY =
+    "I hear you. Whatever you're feeling right now is real, and I'm not going anywhere. Tell me more if you'd like — I'm listening.";
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -102,8 +116,7 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
     setIsLoading(true);
 
     try {
-      // Check if we are in the clarification flow (user is responding to "Are you okay?")
-      // Check if we are in the clarification flow (user is responding to "Are you okay?")
+      // Are we processing a clarification (user responding to "Are you okay?")
       const wasAwaitingClarification = awaitingClarification && flaggedContext;
 
       if (wasAwaitingClarification) {
@@ -113,22 +126,29 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
           studentClarification: userMessageContent,
         });
 
+        // 2. If confirmed crisis: silently log the wellbeing report for staff.
+        //    Don't tell the student about the report.
         if (clarificationResult.isGenuineDistress) {
-          // 2. Generate and store report (fire and forget, or await?)
-          // Await it to ensure it's saved before we continue, though it adds latency.
-          // Let's await to be safe.
           await generateAndStoreReport({
             themes: flaggedContext.themes,
             clarificationSummary: clarificationResult.summary,
             studentName: userName,
             uid: userId,
           });
-          // report generated
+          setPostCrisis(true);
         }
 
-        // Reset clarification state
+        // 3. Exit clarification mode and reply with a hardcoded empathetic message.
+        //    The LLM is bypassed this turn — it has a strong tendency to re-ask
+        //    the same check-in question, which would loop the user.
+        const reply = clarificationResult.isGenuineDistress
+          ? POST_CONFIRMATION_REPLY
+          : POST_FALSE_POSITIVE_REPLY;
+        setMessages((prev) => [...prev, { role: 'model', content: reply }]);
         setAwaitingClarification(false);
         setFlaggedContext(null);
+        setIsLoading(false);
+        return;
       }
 
       // Correct logic for isClarificationResponse:
@@ -147,12 +167,24 @@ export function AuraChat({ userName, userId }: AuraChatProps) {
 
       const response = await mentalHealthChat(finalChatInput);
 
+      // Defensive override: in post-crisis mode, never let the LLM steer the
+      // conversation back to the check-in question. If it tries to flag again,
+      // substitute a warm fallback. The wellbeing report is already on file.
+      if (postCrisis && response.selfHarmSignal) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'model', content: POST_CRISIS_FALLBACK_REPLY },
+        ]);
+        return;
+      }
+
       if (response.responseText) {
         setMessages((prev) => [...prev, { role: 'model', content: response.responseText! }]);
 
-        // Check if NEW self-harm signal is detected (only if not already in clarification flow)
-        // If isClarificationResponse was true, the system prompt *should* prevent this, but check anyway.
-        if (response.selfHarmSignal && !finalChatInput.isClarificationResponse) {
+        // Only flag a NEW clarification turn if we haven't already confirmed
+        // a crisis this session. Post-crisis, further self-harm signals are
+        // logged internally (see fallback above) but don't re-prompt the user.
+        if (response.selfHarmSignal && !postCrisis) {
           setAwaitingClarification(true);
           setFlaggedContext({
             themes: response.conversationThemes || [],

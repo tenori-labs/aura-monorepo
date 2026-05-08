@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import {
     Badge,
@@ -12,7 +11,7 @@ import {
 } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 import { getShadowCaseDetail } from '../shadow-actions';
 import { DownloadRedReport } from './download-red-report';
 
@@ -28,14 +27,9 @@ export default async function ShadowCaseDetailPage({
     params: Promise<{ id: string }>;
 }) {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
+    const user = await getCurrentUser();
     if (!user) redirect('/');
-    const userRole = getUserRole(user);
-    if (userRole !== 'admin') redirect('/dashboard');
+    if (user.role !== 'admin') redirect('/dashboard');
 
     const result = await getShadowCaseDetail(id);
     if ('error' in result) redirect('/shadow');
@@ -62,7 +56,7 @@ export default async function ShadowCaseDetailPage({
             <PageHeader
                 title="Case Detail"
                 subtitle={sc.entityName}
-                userRole={userRole}
+                userRole={user.role}
             />
 
             <Flex

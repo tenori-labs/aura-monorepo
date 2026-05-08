@@ -1,27 +1,41 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Flex, Heading, Text } from '@radix-ui/themes';
 import { CategoryManager } from '@/components/category-manager';
-import { getUserRole } from '@/lib/roles';
+import { SlaConfigForm } from '@/components/sla-config';
+import { SlaBreachBanner } from '@/components/sla-breach-banner';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
+import { getCurrentUser } from '@/lib/auth/server';
+import { getSlaConfig } from './actions';
+import prisma from '@/lib/db';
+import { isIncidentBreached } from '@/lib/sla';
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient();
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Second layer of defense (middleware is first)
   if (!user) {
     redirect('/');
   }
 
-  const role = getUserRole(user);
-  if (role !== 'admin') {
+  if (user.role !== 'admin') {
     redirect('/dashboard');
   }
+  const role = user.role;
+
+  // Load SLA + count org-wide breaches for the alert banner
+  const [{ sla }, allIncidents] = await Promise.all([
+    getSlaConfig(),
+    prisma.incidentReport.findMany({
+      select: {
+        status: true,
+        createdAt: true,
+        acknowledgedAt: true,
+        investigatingAt: true,
+        resolvedAt: true,
+      },
+    }),
+  ]);
+  const breachedCount = allIncidents.filter((i) => isIncidentBreached(i, sla)).length;
 
   return (
     <div
@@ -35,7 +49,7 @@ export default async function AdminDashboardPage() {
     >
       <PageHeader
         title="Admin Dashboard"
-        subtitle={`Welcome, ${user.user_metadata?.full_name ?? user.email?.split('@')[0]}!`}
+        subtitle={`Welcome, ${user.fullName ?? user.email?.split('@')[0] ?? 'Admin'}!`}
         userRole={role}
       />
 
@@ -53,6 +67,21 @@ export default async function AdminDashboardPage() {
           margin: '0 auto',
         }}
       >
+        {/* SLA Breach Alert */}
+        <SlaBreachBanner count={breachedCount} scope="admin" />
+
+        {/* SLA Configuration Section */}
+        <Flex direction="column" gap="3">
+          <Flex direction="column" gap="1">
+            <Heading size={{ initial: '3', sm: '4' }}>Response Time SLAs</Heading>
+            <Text size="2" color="gray">
+              Configure how long faculty have at each stage before incidents are flagged as
+              breaching the SLA.
+            </Text>
+          </Flex>
+          <SlaConfigForm />
+        </Flex>
+
         {/* Category Assignment Section */}
         <Flex direction="column" gap="3">
           <Flex direction="column" gap="1">

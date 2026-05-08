@@ -1,25 +1,19 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Badge, Card, Flex, Heading, Text } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
 import { WellbeingReportTable } from '@/components/wellbeing-report-table';
 import { getWellbeingReports } from '@/app/wellbeing/wellbeing-actions';
-import { getUserRole } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
 
 export default async function WellbeingReportsPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/');
   }
 
-  // Admin-only route
-  if (getUserRole(user) !== 'admin') {
+  if (user.role !== 'admin') {
     redirect('/dashboard');
   }
 

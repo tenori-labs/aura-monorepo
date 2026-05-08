@@ -32,12 +32,28 @@ model IncidentReport {
   mediaType       String?
   mediaFileName   String?
   aiAnalysis      AiAnalysis?
-  status          String       @default("pending")
+  status          String       @default("submitted")
+  // status: "submitted" | "acknowledged" | "investigating" | "resolved"
+  acknowledgedAt  DateTime?    // when faculty acknowledged the report
+  investigatingAt DateTime?    // when faculty started investigating
+  resolvedAt      DateTime?    // when faculty marked resolved
   assignedTo      String?      // faculty user ID (from Supabase)
   assignedToEmail String?      // faculty email for display
   facultyNotes    String?      // faculty observations/actions taken
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+}
+
+/// Global SLA configuration for incident response times.
+/// There is only ever one document in this collection.
+model SlaConfig {
+  id                       String   @id @default(auto()) @map("_id") @db.ObjectId
+  acknowledgeWithinHours   Int      @default(24)
+  investigateWithinHours   Int      @default(72)
+  resolveWithinHours       Int      @default(168)
+  updatedBy                String?
+  updatedAt                DateTime @updatedAt
+  createdAt                DateTime @default(now())
 }
 
 model ConsentRecord {

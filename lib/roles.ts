@@ -21,63 +21,56 @@ export const SHARED_ROUTES = Object.freeze([
 export const ALL_PROTECTED_ROUTES = [...SHARED_ROUTES, ...FACULTY_ROUTES, ...ADMIN_ONLY_ROUTES];
 
 /**
- * Extracts the user role from a Supabase user object's app_metadata.
- * Relies on tamper-proof metadata set by backend database triggers.
- *
- * @param user - Supabase auth user object containing app_metadata
- * @returns The user's role ("admin" | "faculty" | "student"), falling back to "student" if unset
+ * Minimal shape of a Clerk user used by the role helpers.
+ * Accepts any object with `publicMetadata` so server-only Clerk types
+ * and the simpler shapes used in tests/middleware all work.
  */
-export function getUserRole(user: { app_metadata?: Record<string, unknown> } | null): UserRole {
-  const role = user?.app_metadata?.role;
+export interface RoleBearer {
+  publicMetadata?: Record<string, unknown>;
+}
+
+/**
+ * Extracts the user role from a Clerk user's `publicMetadata.role`.
+ * `publicMetadata` is server-set and tamper-proof from the client's perspective.
+ *
+ * @returns The user's role ("admin" | "faculty" | "student"), defaulting to "student".
+ */
+export function getUserRole(user: RoleBearer | null | undefined): UserRole {
+  const role = user?.publicMetadata?.role;
   if (role === 'admin') return 'admin';
   if (role === 'faculty') return 'faculty';
   return 'student';
 }
 
-/**
- * Checks specifically if an authenticated user holds the strict "faculty" role.
- * Does not include admins. For broad route access checks, use `canAccessFacultyRoutes`.
- *
- * @param user - Supabase auth user object containing app_metadata
- * @returns true if the user's role is exactly 'faculty', false otherwise
- */
-export function isFaculty(user: { app_metadata?: Record<string, unknown> } | null): boolean {
+/** Variant that takes the role string directly (for middleware / claims). */
+export function getDashboardPathForRole(role: string | null | undefined): string {
+  if (role === 'admin') return '/admin-dashboard';
+  if (role === 'faculty') return '/faculty-dashboard';
+  return '/dashboard';
+}
+
+/** Strict faculty check (does NOT include admin). Use `canAccessFacultyRoutes` for inclusive checks. */
+export function isFaculty(user: RoleBearer | null | undefined): boolean {
   return getUserRole(user) === 'faculty';
 }
 
-/**
- * Checks specifically if an authenticated user holds the strict "admin" role.
- *
- * @param user - Supabase auth user object containing app_metadata
- * @returns true if the user's role is exactly 'admin', false otherwise
- */
-export function isAdmin(user: { app_metadata?: Record<string, unknown> } | null): boolean {
+/** Strict admin check. */
+export function isAdmin(user: RoleBearer | null | undefined): boolean {
   return getUserRole(user) === 'admin';
 }
 
 /**
- * Determines if a user has sufficient privileges to access faculty-level routes.
- * Admins are treated as a superset of faculty and inherently pass this check.
- *
- * @param user - Supabase auth user object containing app_metadata
- * @returns true if the user is 'faculty' or 'admin', false otherwise
+ * True if the user can access faculty-level routes. Admins are treated as a
+ * superset of faculty.
  */
-export function canAccessFacultyRoutes(
-  user: { app_metadata?: Record<string, unknown> } | null
-): boolean {
+export function canAccessFacultyRoutes(user: RoleBearer | null | undefined): boolean {
   const role = getUserRole(user);
   return role === 'faculty' || role === 'admin';
 }
 
 /**
- * Resolves the appropriate post-login dashboard redirect path based on user role.
- *
- * @param user - Supabase auth user object containing app_metadata
- * @returns The absolute URL path string corresponding to the user's dashboard
+ * Resolves the post-login dashboard path for a user.
  */
-export function getDashboardPath(user: { app_metadata?: Record<string, unknown> } | null): string {
-  const role = getUserRole(user);
-  if (role === 'admin') return '/admin-dashboard';
-  if (role === 'faculty') return '/faculty-dashboard';
-  return '/dashboard';
+export function getDashboardPath(user: RoleBearer | null | undefined): string {
+  return getDashboardPathForRole(getUserRole(user));
 }

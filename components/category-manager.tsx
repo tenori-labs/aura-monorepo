@@ -42,7 +42,7 @@ export function CategoryManager() {
         getFacultyUsers(),
       ]);
 
-      if ('error' in catResult && catResult.error) {
+      if ('error' in catResult) {
         setError(catResult.error);
         return;
       }
@@ -71,7 +71,7 @@ export function CategoryManager() {
     if (!faculty) return;
 
     const result = await assignCategory(category, faculty.id, faculty.name);
-    if (result.error) {
+    if ('error' in result) {
       setError(result.error);
     } else {
       await loadData();
@@ -82,7 +82,7 @@ export function CategoryManager() {
   async function handleRemove(category: string) {
     setSaving(category);
     const result = await removeAssignment(category);
-    if (result.error) {
+    if ('error' in result) {
       setError(result.error);
     } else {
       await loadData();

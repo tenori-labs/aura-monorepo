@@ -1,20 +1,19 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Avatar, Badge, Card, Flex, Heading, Separator, Text } from '@radix-ui/themes';
 import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
 import { FacultyIncidentTable } from '@/components/faculty-incident-table';
+import { SlaBreachBanner } from '@/components/sla-breach-banner';
 import prisma from '@/lib/db';
-import { getUserRole, canAccessFacultyRoutes } from '@/lib/roles';
+import { canAccessFacultyRoutes } from '@/lib/roles';
+import { getCurrentUser } from '@/lib/auth/server';
+import { getSlaConfig } from '@/app/admin-dashboard/actions';
+import { isIncidentBreached } from '@/lib/sla';
+import { normalizeLegacyStatus } from '@/app/faculty-dashboard/incident-validation';
 
 export default async function FacultyDashboardPage() {
-  const supabase = await createClient();
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Second layer of defense (middleware is first)
   if (!user) {
     redirect('/');
   }
@@ -23,15 +22,15 @@ export default async function FacultyDashboardPage() {
     redirect('/dashboard');
   }
 
-  const role = getUserRole(user);
-
   // Admins have their own dashboard
-  if (role === 'admin') {
+  if (user.role === 'admin') {
     redirect('/admin-dashboard');
   }
+
+  const role = user.role;
   const email = user.email ?? 'No email';
-  const name = user.user_metadata?.full_name ?? user.user_metadata?.name ?? email.split('@')[0];
-  const avatarUrl = user.user_metadata?.avatar_url ?? '';
+  const name = user.fullName ?? email.split('@')[0];
+  const avatarUrl = user.imageUrl ?? '';
   const initials = name.charAt(0).toUpperCase();
 
   // Look up which categories this faculty is assigned to
@@ -56,14 +55,24 @@ export default async function FacultyDashboardPage() {
     categoryAssignmentMap[a.category] = a.facultyEmail; // stores faculty name
   }
 
-  // Stats
+  // Load SLA config + flag breaches for this faculty's queue
+  const { sla } = await getSlaConfig();
+  const breachedCount = incidents.filter((i) => isIncidentBreached(i, sla)).length;
+
+  // Stats (use normalized statuses so legacy data still counts)
   const totalReports = incidents.length;
-  const pendingCount = incidents.filter((i) => i.status === 'pending').length;
-  const assignedCount = incidents.filter(
-    (i) => i.status === 'assigned' || categoryAssignmentMap[i.incidentType]
+  const submittedCount = incidents.filter(
+    (i) => normalizeLegacyStatus(i.status) === 'submitted'
   ).length;
-  const reviewingCount = incidents.filter((i) => i.status === 'reviewing').length;
-  const resolvedCount = incidents.filter((i) => i.status === 'resolved').length;
+  const acknowledgedCount = incidents.filter(
+    (i) => normalizeLegacyStatus(i.status) === 'acknowledged'
+  ).length;
+  const investigatingCount = incidents.filter(
+    (i) => normalizeLegacyStatus(i.status) === 'investigating'
+  ).length;
+  const resolvedCount = incidents.filter(
+    (i) => normalizeLegacyStatus(i.status) === 'resolved'
+  ).length;
 
   return (
     <div
@@ -146,6 +155,9 @@ export default async function FacultyDashboardPage() {
           </Flex>
         </Card>
 
+        {/* ─── SLA Breach Alert ─── */}
+        <SlaBreachBanner count={breachedCount} scope="faculty" />
+
         {/* ─── Stats Overview ─── */}
         <Flex gap="3" wrap="wrap">
           <Card size="1" style={{ flex: '1 1 120px', minWidth: '120px' }}>
@@ -161,30 +173,30 @@ export default async function FacultyDashboardPage() {
           <Card size="1" style={{ flex: '1 1 120px', minWidth: '120px' }}>
             <Flex direction="column" align="center" gap="1" py="2">
               <Text size="5" weight="bold" color="blue">
-                {pendingCount}
+                {submittedCount}
               </Text>
               <Text size="1" color="gray">
-                Pending
+                Submitted
               </Text>
             </Flex>
           </Card>
           <Card size="1" style={{ flex: '1 1 120px', minWidth: '120px' }}>
             <Flex direction="column" align="center" gap="1" py="2">
               <Text size="5" weight="bold" color="violet">
-                {assignedCount}
+                {acknowledgedCount}
               </Text>
               <Text size="1" color="gray">
-                Assigned
+                Acknowledged
               </Text>
             </Flex>
           </Card>
           <Card size="1" style={{ flex: '1 1 120px', minWidth: '120px' }}>
             <Flex direction="column" align="center" gap="1" py="2">
               <Text size="5" weight="bold" color="orange">
-                {reviewingCount}
+                {investigatingCount}
               </Text>
               <Text size="1" color="gray">
-                In Review
+                Investigating
               </Text>
             </Flex>
           </Card>
@@ -195,6 +207,16 @@ export default async function FacultyDashboardPage() {
               </Text>
               <Text size="1" color="gray">
                 Resolved
+              </Text>
+            </Flex>
+          </Card>
+          <Card size="1" style={{ flex: '1 1 120px', minWidth: '120px' }}>
+            <Flex direction="column" align="center" gap="1" py="2">
+              <Text size="5" weight="bold" color="red">
+                {breachedCount}
+              </Text>
+              <Text size="1" color="gray">
+                SLA Breached
               </Text>
             </Flex>
           </Card>
@@ -241,23 +263,21 @@ export default async function FacultyDashboardPage() {
                 'Other',
               ]}
               isAdmin={false}
+              sla={sla}
             />
           )}
         </Flex>
       </Flex>
 
       {/* ─── Responsive Styles ─── */}
-      <style>
-        {' '}
-        {`
-                @media (max-width: 640px) {
-                    .hide-on-mobile { display: none !important; }
-                }
-                @media (min-width: 641px) {
-                    .hide-on-desktop { display: none !important; }
-                }
-            `}
-      </style>
+      <style>{`
+        @media (max-width: 640px) {
+          .hide-on-mobile { display: none !important; }
+        }
+        @media (min-width: 641px) {
+          .hide-on-desktop { display: none !important; }
+        }
+      `}</style>
       <PageFooter />
     </div>
   );

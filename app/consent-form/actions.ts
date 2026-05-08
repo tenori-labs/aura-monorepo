@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/server';
 import prisma from '@/lib/db';
 import { headers } from 'next/headers';
 import { isSignatureValid } from './consent-validation';
@@ -13,11 +13,7 @@ import { isSignatureValid } from './consent-validation';
  * @param formData - The form data containing student details such as `signature`, `fullName`, `studentId`, and `course`.
  */
 export async function submitConsent(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getCurrentUser();
   if (!user) {
     throw new Error('Unauthorized');
   }

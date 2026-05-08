@@ -2,25 +2,50 @@
 
 import { Box, Button, Card, Flex, Heading, Link, Text, TextField } from '@radix-ui/themes';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { login } from '@/app/auth/actions';
-import { useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useSignIn } from '@clerk/nextjs';
 import { Spinner } from '@/components/spinner';
 
-function LoginButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" formAction={login} disabled={pending}>
-      {pending ? <><Spinner /> Signing in…</> : 'Sign in'}
-    </Button>
-  );
-}
+export default function Home() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const router = useRouter();
 
-function LoginForm() {
-  const searchParams = useSearchParams();
-  const error = searchParams.get('error');
   const [selectedRole, setSelectedRole] = useState<'student' | 'faculty' | 'admin'>('student');
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  const isFetching = fetchStatus === 'fetching';
+
+  const handleSubmit = async (formData: FormData) => {
+    setGlobalError(null);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    const { error } = await signIn.password({
+      identifier: email,
+      password,
+    });
+
+    if (error) {
+      const e = error as { longMessage?: string; message?: string };
+      setGlobalError(e.longMessage ?? e.message ?? 'Sign-in failed.');
+      return;
+    }
+
+    if (signIn.status === 'complete') {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) return;
+          const url = decorateUrl('/dashboard');
+          if (url.startsWith('http')) {
+            window.location.href = url;
+          } else {
+            router.push(url);
+          }
+        },
+      });
+    }
+  };
 
   return (
     <div
@@ -48,21 +73,21 @@ function LoginForm() {
             Sign in to your account to continue.
           </Text>
 
-          {error && (
+          {globalError && (
             <Box
               mb="5"
               p="3"
               style={{ backgroundColor: 'var(--red-a3)', borderRadius: 'var(--radius-2)' }}
             >
               <Text size="2" color="red">
-                {error}
+                {globalError}
               </Text>
             </Box>
           )}
 
           <Flex direction="column" asChild>
-            <form>
-              {/* Role Selector */}
+            <form action={handleSubmit}>
+              {/* Role Selector — display-only; the real role is set in publicMetadata at signup. */}
               <Flex
                 gap="0"
                 mb="5"
@@ -72,61 +97,30 @@ function LoginForm() {
                   overflow: 'hidden',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole('student')}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRight: '1px solid var(--gray-a6)',
-                    background: selectedRole === 'student' ? 'var(--accent-a3)' : 'transparent',
-                    color: selectedRole === 'student' ? 'var(--accent-11)' : 'var(--gray-11)',
-                    cursor: 'pointer',
-                    fontWeight: selectedRole === 'student' ? 600 : 400,
-                    fontSize: '14px',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole('faculty')}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRight: '1px solid var(--gray-a6)',
-                    background: selectedRole === 'faculty' ? 'var(--accent-a3)' : 'transparent',
-                    color: selectedRole === 'faculty' ? 'var(--accent-11)' : 'var(--gray-11)',
-                    cursor: 'pointer',
-                    fontWeight: selectedRole === 'faculty' ? 600 : 400,
-                    fontSize: '14px',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  Faculty
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRole('admin')}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    border: 'none',
-                    background: selectedRole === 'admin' ? 'var(--accent-a3)' : 'transparent',
-                    color: selectedRole === 'admin' ? 'var(--accent-11)' : 'var(--gray-11)',
-                    cursor: 'pointer',
-                    fontWeight: selectedRole === 'admin' ? 600 : 400,
-                    fontSize: '14px',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  Admin
-                </button>
+                {(['student', 'faculty', 'admin'] as const).map((role, idx) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setSelectedRole(role)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      border: 'none',
+                      borderRight: idx < 2 ? '1px solid var(--gray-a6)' : 'none',
+                      background: selectedRole === role ? 'var(--accent-a3)' : 'transparent',
+                      color: selectedRole === role ? 'var(--accent-11)' : 'var(--gray-11)',
+                      cursor: 'pointer',
+                      fontWeight: selectedRole === role ? 600 : 400,
+                      fontSize: '14px',
+                      textTransform: 'capitalize',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {role}
+                  </button>
+                ))}
               </Flex>
-              <input type="hidden" name="role" value={selectedRole} />
+
               <Box mb="5">
                 <Text
                   as="label"
@@ -146,6 +140,11 @@ function LoginForm() {
                   placeholder="Enter your email"
                   required
                 />
+                {errors?.fields?.identifier && (
+                  <Text size="1" color="red" mt="1" style={{ display: 'block' }}>
+                    {errors.fields.identifier.message}
+                  </Text>
+                )}
               </Box>
 
               <Box mb="5">
@@ -167,26 +166,31 @@ function LoginForm() {
                   placeholder="Enter your password"
                   required
                 />
+                {errors?.fields?.password && (
+                  <Text size="1" color="red" mt="1" style={{ display: 'block' }}>
+                    {errors.fields.password.message}
+                  </Text>
+                )}
               </Box>
 
               <Flex mt="6" justify="end" gap="3" align="center">
                 <Link href="/signup" size="2">
                   Create an account
                 </Link>
-                <LoginButton />
+                <Button type="submit" disabled={isFetching}>
+                  {isFetching ? (
+                    <>
+                      <Spinner /> Signing in…
+                    </>
+                  ) : (
+                    'Sign in'
+                  )}
+                </Button>
               </Flex>
             </form>
           </Flex>
         </Card>
       </Flex>
     </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
   );
 }

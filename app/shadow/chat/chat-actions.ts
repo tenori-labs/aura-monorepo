@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/server';
 import {
     interrogationChat,
     type ChatMessage,
@@ -16,10 +16,7 @@ import {
  * @returns The active session with chat history, or null
  */
 export async function getActiveSession() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         return { error: 'Not authenticated.' };
@@ -58,10 +55,7 @@ export async function getActiveSession() {
  * @returns AI response and updated session state
  */
 export async function sendInterrogationMessage(sessionId: string, messageText: string) {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         return { error: 'Not authenticated.' };
@@ -160,10 +154,7 @@ async function checkAllSessionsComplete(shadowCaseId: string) {
  * @returns Count of pending/in-progress sessions
  */
 export async function getPendingInterviewCount() {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
         return { count: 0 };

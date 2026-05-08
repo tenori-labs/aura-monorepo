@@ -16,7 +16,7 @@ const ClarifyOutputSchema = z.object({
   isGenuineDistress: z
     .boolean()
     .describe(
-      'Whether this represents genuine distress requiring support. Be conservative — if uncertain, set to true.'
+      'TRUE when the original flagged message contained explicit self-harm/suicidal language AND the student affirmed (including short answers like "yes", "yeah", "i guess", "maybe"), or when the response itself contains explicit indicators. FALSE only when the student explicitly clarifies it was venting/exaggeration/a joke, or gives a clear reassurance.'
     ),
   summary: z
     .string()
@@ -54,20 +54,28 @@ export const clarifyDistress = ai.defineFlow(
     try {
       const { output } = await ai.generate({
         model: 'googleai/gemini-2.0-flash-001',
-        prompt: `A student sent a message that contained possible self-harm language.
-They were gently asked how they were doing and responded.
+        prompt: `A student's earlier message was flagged as a possible self-harm signal.
+They were gently asked "are you having thoughts of harming yourself?" and responded.
 
 Original message: "${sanitizedOriginal}"
 Student's response to check-in: "${sanitizedClarification}"
 
-Determine: is this genuine distress requiring support, or was the original message frustration/venting?
+Your job: combine BOTH messages and decide whether the student is confirming a real self-harm or suicidal-ideation crisis.
 
-Guidelines:
-- "I'm fine, just frustrated" → isGenuineDistress: false
-- "I don't know... I just don't want to be here anymore" → isGenuineDistress: true
-- Ambiguous or uncertain → isGenuineDistress: true (be conservative)
+Set isGenuineDistress = TRUE when ANY of:
+1. The original message contains explicit self-harm/suicidal language (e.g. "kill myself", "kms", "end it all", "want to die", "don't want to be here", "hurt myself") AND the student's response is an affirmation or non-denial — including short ones: "yes", "yeah", "yep", "i think so", "i guess", "kinda", "maybe", "i don't know", "kind of"
+2. The student's response itself contains explicit indicators (wanting to die, hurt themselves, suicidal thoughts, a method or plan)
+3. The student's response describes active intent, hopelessness combined with desire to disappear, or a plan
+4. The student is silent / says nothing dismissive
 
-In summary, write one neutral sentence describing the context for a wellbeing report. No names. No direct quotes from the student. Use observational language only.`,
+Set isGenuineDistress = FALSE ONLY when:
+1. The student explicitly clarifies the original was venting / exaggeration / a joke (e.g. "no, just frustrated", "i was joking", "just venting", "i didn't mean it literally", "i'm fine", "no I'm okay")
+2. The original message was about something else entirely (e.g. "this homework is killing me", "she'll kill me when she finds out") AND the student confirms that
+3. The student gives a clear, articulate reassurance that they are not in crisis
+
+A short "yes" or "yeah" to the explicit check-in question, after an explicit original message, is a CONFIRMATION — never treat it as ambiguous and FALSE. The whole point of the check-in is to give the student a chance to confirm or deny; "yes" is a confirmation.
+
+For summary: one neutral observational sentence about the conversation context. No names. No direct quotes.`,
         output: { schema: ClarifyOutputSchema },
       });
 
@@ -84,10 +92,13 @@ In summary, write one neutral sentence describing the context for a wellbeing re
       clearPIISession(sessionId1);
       clearPIISession(sessionId2);
       console.error('Error in clarifyDistress flow:', e);
-      // Conservative default: if the flow fails, treat as genuine
+      // Default to FALSE on error — we don't want to silently create wellbeing
+      // reports for students whose only "evidence" is that the LLM call failed.
+      // Aura will continue the conversation; staff can intervene through other
+      // channels if the student is genuinely in crisis.
       return {
-        isGenuineDistress: true,
-        summary: 'Unable to complete clarification assessment. Flagged for manual review.',
+        isGenuineDistress: false,
+        summary: 'Clarification assessment failed; no determination made.',
       };
     }
   }

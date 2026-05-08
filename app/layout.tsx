@@ -4,6 +4,7 @@ import './globals.css';
 import '@radix-ui/themes/styles.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Theme } from '@radix-ui/themes';
+import { ClerkProvider } from '@clerk/nextjs';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,16 +29,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Theme accentColor="lime" radius="full" scaling="110%">
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
-        </Theme>
+        <ClerkProvider>
+          <Theme accentColor="lime" radius="full" scaling="110%">
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </Theme>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Box, Flex, Text, Button } from '@radix-ui/themes';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { signout } from '@/app/auth/actions';
-import { createClient } from '@/lib/supabase/client';
+import { useClerk, useUser } from '@clerk/nextjs';
 import type { UserRole } from '@/lib/roles';
 
 const allNavItems = [
@@ -55,20 +54,18 @@ export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
   const [role, setRole] = useState<UserRole>(propRole || 'student');
   const [pendingCount, setPendingCount] = useState(0);
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut } = useClerk();
+  const { user: clerkUser } = useUser();
 
-  // Fetch role from Supabase if not passed as prop
+  // Read role from Clerk publicMetadata if not passed as prop
   useEffect(() => {
-    if (propRole) {
-      return;
+    if (propRole) return;
+    const r = clerkUser?.publicMetadata?.role as string | undefined;
+    if (r === 'admin' || r === 'faculty' || r === 'student') {
+      setRole(r);
     }
-
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.app_metadata?.role) {
-        setRole(user.app_metadata.role as UserRole);
-      }
-    });
-  }, [propRole]);
+  }, [propRole, clerkUser]);
 
   // Fetch pending interview count
   useEffect(() => {
@@ -242,7 +239,12 @@ export function HamburgerMenu({ userRole: propRole }: HamburgerMenuProps) {
                   <Text size="2">Theme:</Text>
                   <ThemeToggle />
                 </Flex>
-                <Button onClick={() => signout()} variant="soft" color="red" size="2">
+                <Button
+                  onClick={() => signOut(() => router.push('/'))}
+                  variant="soft"
+                  color="red"
+                  size="2"
+                >
                   Sign out
                 </Button>
               </Flex>

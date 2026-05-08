@@ -13,7 +13,7 @@ import {
 // ─── Helper factories ───────────────────────────────────────────────
 
 const makeUser = (role?: string) => ({
-    app_metadata: role ? { role } : {},
+    publicMetadata: role ? { role } : {},
 });
 
 // ─── getUserRole — parametrized valid roles ─────────────────────────
@@ -35,7 +35,7 @@ describe('getUserRole', () => {
         expect(getUserRole(null)).toBe('student');
     });
 
-    it('falls back to "student" when app_metadata is undefined', () => {
+    it('falls back to "student" when publicMetadata is undefined', () => {
         expect(getUserRole({})).toBe('student');
     });
 
@@ -45,11 +45,11 @@ describe('getUserRole', () => {
 
     // Type safety
     it('handles numeric role gracefully', () => {
-        expect(getUserRole({ app_metadata: { role: 123 } })).toBe('student');
+        expect(getUserRole({ publicMetadata: { role: 123 } })).toBe('student');
     });
 
     it('handles object role gracefully', () => {
-        expect(getUserRole({ app_metadata: { role: {} } })).toBe('student');
+        expect(getUserRole({ publicMetadata: { role: {} } })).toBe('student');
     });
 });
 
