@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -18,11 +18,18 @@ import {
 import { Button } from '@radix-ui/themes';
 import { IncidentTimeline } from '@/components/incident-timeline';
 import {
-  updateIncidentStatus,
+  acknowledgeIncident,
+  startInvestigation,
+  resolveIncident,
   updateIncidentNotes,
 } from '@/app/faculty-dashboard/incident-actions';
+import {
+  isIncidentBreached,
+  statusLabel,
+  type SlaConfig,
+} from '@/lib/sla';
+import { normalizeLegacyStatus } from '@/app/faculty-dashboard/incident-validation';
 
-// Type matching the Prisma IncidentReport model
 interface AiAnalysis {
   category: string;
   confidence: number;
@@ -45,6 +52,9 @@ interface IncidentReport {
   mediaFileName: string | null;
   aiAnalysis: AiAnalysis | null;
   status: string;
+  acknowledgedAt: Date | string | null;
+  investigatingAt: Date | string | null;
+  resolvedAt: Date | string | null;
   assignedTo: string | null;
   assignedToEmail: string | null;
   facultyNotes: string | null;
@@ -54,19 +64,22 @@ interface IncidentReport {
 
 interface Props {
   incidents: IncidentReport[];
-  categoryAssignments: Record<string, string>; // category -> faculty name
-  assignedCategories: string[]; // categories this faculty has access to
-  allCategories: string[]; // all 6 incident categories
-  isAdmin: boolean; // admins see everything
+  categoryAssignments: Record<string, string>;
+  assignedCategories: string[];
+  allCategories: string[];
+  isAdmin: boolean;
+  sla: SlaConfig;
 }
 
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'pending':
+  switch (normalizeLegacyStatus(status)) {
+    case 'submitted':
       return 'blue' as const;
-    case 'reviewing':
+    case 'acknowledged':
+      return 'violet' as const;
+    case 'investigating':
       return 'orange' as const;
-    case 'closed':
+    case 'resolved':
       return 'green' as const;
     default:
       return 'gray' as const;
@@ -106,19 +119,32 @@ const formatDateTime = (date: Date) => {
 
 const shortId = (id: string) => `RPT-${id.slice(-4).toUpperCase()}`;
 
+function nextActionLabel(status: string): { label: string; nextStatus: string } | null {
+  switch (normalizeLegacyStatus(status)) {
+    case 'submitted':
+      return { label: 'Acknowledge Report', nextStatus: 'acknowledged' };
+    case 'acknowledged':
+      return { label: 'Start Investigating', nextStatus: 'investigating' };
+    case 'investigating':
+      return { label: 'Mark Resolved', nextStatus: 'resolved' };
+    default:
+      return null;
+  }
+}
+
 export function FacultyIncidentTable({
   incidents,
   categoryAssignments,
   assignedCategories,
   allCategories,
   isAdmin,
+  sla,
 }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<IncidentReport | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [newStatus, setNewStatus] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{
@@ -126,22 +152,41 @@ export function FacultyIncidentTable({
     text: string;
   } | null>(null);
 
-  // When a new incident is selected, populate the form fields
   const handleSelect = (incident: IncidentReport) => {
     setSelected(incident);
-    setNewStatus(incident.status);
     setNotes(incident.facultyNotes ?? '');
     setSaveMessage(null);
   };
 
-  const handleSave = async () => {
+  // Keep `selected` in sync with the freshest server data after router.refresh().
+  // Without this, clicking the next-stage button right after a transition can
+  // operate on a stale local object and silently no-op.
+  useEffect(() => {
     if (!selected) return;
+    const fresh = incidents.find((i) => i.id === selected.id);
+    if (fresh && fresh.status !== selected.status) {
+      setSelected(fresh);
+    }
+  }, [incidents, selected]);
+
+  const advanceStatus = async () => {
+    if (!selected) return;
+    const action = nextActionLabel(selected.status);
+    if (!action) return;
+
     setIsSaving(true);
     setSaveMessage(null);
 
     try {
+      const transition =
+        action.nextStatus === 'acknowledged'
+          ? acknowledgeIncident
+          : action.nextStatus === 'investigating'
+            ? startInvestigation
+            : resolveIncident;
+
       const [statusResult, notesResult] = await Promise.all([
-        updateIncidentStatus(selected.id, newStatus),
+        transition(selected.id),
         updateIncidentNotes(selected.id, notes),
       ]);
 
@@ -154,10 +199,20 @@ export function FacultyIncidentTable({
         return;
       }
 
-      // Update local state so UI reflects immediately
-      setSelected({ ...selected, status: newStatus, facultyNotes: notes });
-      setSaveMessage({ type: 'success', text: 'Saved successfully' });
-      router.refresh(); // re-fetch server data so the table updates
+      const now = new Date();
+      const updated: IncidentReport = {
+        ...selected,
+        status: action.nextStatus,
+        facultyNotes: notes,
+        ...(action.nextStatus === 'acknowledged' ? { acknowledgedAt: now } : {}),
+        ...(action.nextStatus === 'investigating' ? { investigatingAt: now } : {}),
+        ...(action.nextStatus === 'resolved' ? { resolvedAt: now } : {}),
+      };
+      setSelected(updated);
+      setSaveMessage({ type: 'success', text: `Status updated to ${updated.status}.` });
+      router.refresh();
+      // Give React a tick to flush the new state before the user can click again.
+      await new Promise((r) => setTimeout(r, 0));
     } catch {
       setSaveMessage({ type: 'error', text: 'An unexpected error occurred.' });
     } finally {
@@ -165,11 +220,34 @@ export function FacultyIncidentTable({
     }
   };
 
-  // Filter incidents by selected category
+  const saveNotesOnly = async () => {
+    if (!selected) return;
+    setIsSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const result = await updateIncidentNotes(selected.id, notes);
+      if (result.error) {
+        setSaveMessage({ type: 'error', text: result.error });
+        return;
+      }
+      setSelected({ ...selected, facultyNotes: notes });
+      setSaveMessage({ type: 'success', text: 'Notes saved' });
+      router.refresh();
+    } catch {
+      setSaveMessage({ type: 'error', text: 'An unexpected error occurred.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const filteredIncidents =
     categoryFilter === 'all'
       ? incidents
       : incidents.filter((i) => i.incidentType === categoryFilter);
+
+  const action = selected ? nextActionLabel(selected.status) : null;
+  const selectedBreached = selected ? isIncidentBreached(selected, sla) : false;
 
   return (
     <>
@@ -239,8 +317,13 @@ export function FacultyIncidentTable({
                       variant="soft"
                       style={{ textTransform: 'capitalize' }}
                     >
-                      {selected.status}
+                      {statusLabel(normalizeLegacyStatus(selected.status))}
                     </Badge>
+                    {selectedBreached && (
+                      <Badge color="red" size="2" variant="solid">
+                        SLA Breached
+                      </Badge>
+                    )}
                   </Flex>
                 </Dialog.Title>
                 <Dialog.Description size="2" color="gray">
@@ -284,16 +367,14 @@ export function FacultyIncidentTable({
                       {formatDateTime(selected.dateTime)}
                     </Text>
                   </Box>
-                  {selected.userEmail && (
-                    <Box>
-                      <Text size="1" color="gray" mb="1" style={{ display: 'block' }}>
-                        Reported By
-                      </Text>
-                      <Text size="2" weight="medium" style={{ wordBreak: 'break-all' }}>
-                        {selected.userEmail}
-                      </Text>
-                    </Box>
-                  )}
+                  <Box>
+                    <Text size="1" color="gray" mb="1" style={{ display: 'block' }}>
+                      Reported By
+                    </Text>
+                    <Text size="2" weight="medium" style={{ fontFamily: 'monospace' }}>
+                      {shortId(selected.id)}
+                    </Text>
+                  </Box>
                 </Flex>
 
                 <Separator size="4" my="3" />
@@ -439,25 +520,12 @@ export function FacultyIncidentTable({
                   Faculty Actions & Updates
                 </Text>
                 <Text size="1" color="gray" mb="3" style={{ display: 'block' }}>
-                  Update the incident status and add your notes here.
+                  {action
+                    ? `Next step: ${action.label}. Add your notes below before advancing.`
+                    : 'This report has been resolved. You can still update your notes below.'}
                 </Text>
 
                 <Flex direction="column" gap="3">
-                  {/* Status Dropdown */}
-                  <Box>
-                    <Text size="1" color="gray" mb="1" style={{ display: 'block' }}>
-                      Update Incident Status
-                    </Text>
-                    <Select.Root size="2" value={newStatus} onValueChange={setNewStatus}>
-                      <Select.Trigger style={{ width: '100%' }} />
-                      <Select.Content>
-                        <Select.Item value="pending">Pending</Select.Item>
-                        <Select.Item value="reviewing">In Review</Select.Item>
-                        <Select.Item value="closed">Closed</Select.Item>
-                      </Select.Content>
-                    </Select.Root>
-                  </Box>
-
                   {/* Notes Textarea */}
                   <Box>
                     <Text size="1" color="gray" mb="1" style={{ display: 'block' }}>
@@ -495,14 +563,25 @@ export function FacultyIncidentTable({
                 }}
               >
                 <Flex direction="column" gap="2">
+                  {action && (
+                    <Button
+                      variant="solid"
+                      size="3"
+                      style={{ width: '100%' }}
+                      onClick={advanceStatus}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? 'Saving...' : action.label}
+                    </Button>
+                  )}
                   <Button
-                    variant="solid"
+                    variant="soft"
                     size="3"
                     style={{ width: '100%' }}
-                    onClick={handleSave}
+                    onClick={saveNotesOnly}
                     disabled={isSaving}
                   >
-                    {isSaving ? 'Saving...' : 'Save Update'}
+                    {isSaving ? 'Saving...' : 'Save Notes Only'}
                   </Button>
                   <Button
                     variant="outline"
@@ -557,14 +636,15 @@ export function FacultyIncidentTable({
             </Dialog.Description>
           </Box>
           <Box px="4" py="3" style={{ flex: 1, overflowY: 'auto' }}>
-            <IncidentTimeline
-              status={selected?.status ?? 'pending'}
-              assignedTo={
-                selected
-                  ? (categoryAssignments[selected.incidentType] ?? selected.assignedToEmail ?? null)
-                  : null
-              }
-            />
+            {selected && (
+              <IncidentTimeline
+                incident={selected}
+                sla={sla}
+                assignedTo={
+                  categoryAssignments[selected.incidentType] ?? selected.assignedToEmail ?? null
+                }
+              />
+            )}
           </Box>
           <Box px="4" py="3" style={{ borderTop: '1px solid var(--gray-a4)', flexShrink: 0 }}>
             <Dialog.Close>
@@ -587,59 +667,74 @@ export function FacultyIncidentTable({
                 <Table.ColumnHeaderCell>Location</Table.ColumnHeaderCell>
                 <Table.ColumnHeaderCell>Date Reported</Table.ColumnHeaderCell>
                 <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell>SLA</Table.ColumnHeaderCell>
                 <Table.ColumnHeaderCell>AI Validity</Table.ColumnHeaderCell>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {filteredIncidents.map((incident) => (
-                <Table.Row
-                  key={incident.id}
-                  onClick={() => handleSelect(incident)}
-                  style={{ cursor: 'pointer', transition: 'background 0.1s' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--gray-a3)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <Table.Cell>
-                    <Text size="2" weight="medium" style={{ fontFamily: 'monospace' }}>
-                      {shortId(incident.id)}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text size="2">{incident.incidentType}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text size="2">{incident.location}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text size="2">{formatDate(incident.createdAt)}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Badge
-                      color={getStatusColor(incident.status)}
-                      size="1"
-                      variant="soft"
-                      style={{ textTransform: 'capitalize' }}
-                    >
-                      {incident.status}
-                    </Badge>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {incident.aiAnalysis ? (
+              {filteredIncidents.map((incident) => {
+                const breached = isIncidentBreached(incident, sla);
+                return (
+                  <Table.Row
+                    key={incident.id}
+                    onClick={() => handleSelect(incident)}
+                    style={{ cursor: 'pointer', transition: 'background 0.1s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--gray-a3)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Table.Cell>
+                      <Text size="2" weight="medium" style={{ fontFamily: 'monospace' }}>
+                        {shortId(incident.id)}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text size="2">{incident.incidentType}</Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text size="2">{incident.location}</Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text size="2">{formatDate(incident.createdAt)}</Text>
+                    </Table.Cell>
+                    <Table.Cell>
                       <Badge
-                        color={getValidityColor(incident.aiAnalysis.validity)}
+                        color={getStatusColor(incident.status)}
                         size="1"
                         variant="soft"
+                        style={{ textTransform: 'capitalize' }}
                       >
-                        {incident.aiAnalysis.validity}
+                        {statusLabel(normalizeLegacyStatus(incident.status))}
                       </Badge>
-                    ) : (
-                      <Text size="1" color="gray">
-                        N/A
-                      </Text>
-                    )}
-                  </Table.Cell>
-                </Table.Row>
-              ))}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {breached ? (
+                        <Badge color="red" size="1" variant="solid">
+                          Breached
+                        </Badge>
+                      ) : (
+                        <Badge color="green" size="1" variant="soft">
+                          On Track
+                        </Badge>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {incident.aiAnalysis ? (
+                        <Badge
+                          color={getValidityColor(incident.aiAnalysis.validity)}
+                          size="1"
+                          variant="soft"
+                        >
+                          {incident.aiAnalysis.validity}
+                        </Badge>
+                      ) : (
+                        <Text size="1" color="gray">
+                          N/A
+                        </Text>
+                      )}
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
             </Table.Body>
           </Table.Root>
         </Box>
@@ -647,78 +742,88 @@ export function FacultyIncidentTable({
 
       {/* ─── Mobile Card View (hidden on desktop) ─── */}
       <Flex direction="column" gap="3" className="hide-on-desktop">
-        {filteredIncidents.map((incident) => (
-          <Card
-            key={incident.id}
-            size="2"
-            onClick={() => handleSelect(incident)}
-            style={{ cursor: 'pointer', transition: 'background 0.1s' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--gray-a2)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-          >
-            <Flex justify="between" align="start" gap="2" mb="2">
-              <Flex direction="column" gap="1" style={{ flex: 1 }}>
-                <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
-                  {shortId(incident.id)}
-                </Text>
-                <Text size="3" weight="bold">
-                  {incident.incidentType}
-                </Text>
-              </Flex>
-              <Badge
-                color={getStatusColor(incident.status)}
-                size="1"
-                variant="soft"
-                style={{ textTransform: 'capitalize', flexShrink: 0 }}
-              >
-                {incident.status}
-              </Badge>
-            </Flex>
-
-            <Separator size="4" mb="2" />
-
-            <Flex direction="column" gap="1">
-              <Flex justify="between" gap="1">
-                <Text size="1" color="gray">
-                  Location
-                </Text>
-                <Text size="1" weight="medium">
-                  {incident.location}
-                </Text>
-              </Flex>
-              <Flex justify="between" gap="1">
-                <Text size="1" color="gray">
-                  Date
-                </Text>
-                <Text size="1" weight="medium">
-                  {formatDate(incident.createdAt)}
-                </Text>
-              </Flex>
-              <Flex justify="between" gap="1">
-                <Text size="1" color="gray">
-                  AI Validity
-                </Text>
-                {incident.aiAnalysis ? (
+        {filteredIncidents.map((incident) => {
+          const breached = isIncidentBreached(incident, sla);
+          return (
+            <Card
+              key={incident.id}
+              size="2"
+              onClick={() => handleSelect(incident)}
+              style={{ cursor: 'pointer', transition: 'background 0.1s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--gray-a2)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+            >
+              <Flex justify="between" align="start" gap="2" mb="2">
+                <Flex direction="column" gap="1" style={{ flex: 1 }}>
+                  <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
+                    {shortId(incident.id)}
+                  </Text>
+                  <Text size="3" weight="bold">
+                    {incident.incidentType}
+                  </Text>
+                </Flex>
+                <Flex direction="column" gap="1" align="end">
                   <Badge
-                    color={getValidityColor(incident.aiAnalysis.validity)}
+                    color={getStatusColor(incident.status)}
                     size="1"
                     variant="soft"
+                    style={{ textTransform: 'capitalize', flexShrink: 0 }}
                   >
-                    {incident.aiAnalysis.validity}
+                    {statusLabel(normalizeLegacyStatus(incident.status))}
                   </Badge>
-                ) : (
-                  <Text size="1" color="gray">
-                    N/A
-                  </Text>
-                )}
+                  {breached && (
+                    <Badge color="red" size="1" variant="solid">
+                      Breached
+                    </Badge>
+                  )}
+                </Flex>
               </Flex>
-            </Flex>
 
-            <Text size="1" color="blue" mt="2" style={{ display: 'block', textAlign: 'right' }}>
-              Tap to view details →
-            </Text>
-          </Card>
-        ))}
+              <Separator size="4" mb="2" />
+
+              <Flex direction="column" gap="1">
+                <Flex justify="between" gap="1">
+                  <Text size="1" color="gray">
+                    Location
+                  </Text>
+                  <Text size="1" weight="medium">
+                    {incident.location}
+                  </Text>
+                </Flex>
+                <Flex justify="between" gap="1">
+                  <Text size="1" color="gray">
+                    Date
+                  </Text>
+                  <Text size="1" weight="medium">
+                    {formatDate(incident.createdAt)}
+                  </Text>
+                </Flex>
+                <Flex justify="between" gap="1">
+                  <Text size="1" color="gray">
+                    AI Validity
+                  </Text>
+                  {incident.aiAnalysis ? (
+                    <Badge
+                      color={getValidityColor(incident.aiAnalysis.validity)}
+                      size="1"
+                      variant="soft"
+                    >
+                      {incident.aiAnalysis.validity}
+                    </Badge>
+                  ) : (
+                    <Text size="1" color="gray">
+                      N/A
+                    </Text>
+                  )}
+                </Flex>
+              </Flex>
+
+              <Text size="1" color="blue" mt="2" style={{ display: 'block', textAlign: 'right' }}>
+                Tap to view details →
+              </Text>
+            </Card>
+          );
+        })}
       </Flex>
 
       {/* ─── Media Lightbox ─── */}

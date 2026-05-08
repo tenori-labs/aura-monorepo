@@ -1,29 +1,76 @@
 'use client';
 
-import { Flex, Text, Box } from '@radix-ui/themes';
-import { FileTextIcon, MagnifyingGlassIcon, CheckCircledIcon } from '@radix-ui/react-icons';
+import { Badge, Box, Flex, Text } from '@radix-ui/themes';
+import {
+  CheckCircledIcon,
+  FileTextIcon,
+  HandIcon,
+  MagnifyingGlassIcon,
+} from '@radix-ui/react-icons';
+import {
+  computeStageDeadlines,
+  formatRemaining,
+  type SlaConfig,
+  type SlaIncident,
+} from '@/lib/sla';
+import { normalizeLegacyStatus } from '@/app/faculty-dashboard/incident-validation';
 
-/**
- * The 3 stages of an incident report lifecycle.
- */
 const STAGES = [
-  { key: 'pending', label: 'Submitted', icon: FileTextIcon },
-  { key: 'reviewing', label: 'In Review', icon: MagnifyingGlassIcon },
-  { key: 'closed', label: 'Closed', icon: CheckCircledIcon },
+  { key: 'submitted', label: 'Submitted', icon: FileTextIcon, slaStage: null as const },
+  { key: 'acknowledged', label: 'Acknowledged', icon: HandIcon, slaStage: 'acknowledge' as const },
+  {
+    key: 'investigating',
+    label: 'Investigating',
+    icon: MagnifyingGlassIcon,
+    slaStage: 'investigate' as const,
+  },
+  { key: 'resolved', label: 'Resolved', icon: CheckCircledIcon, slaStage: 'resolve' as const },
 ] as const;
 
-function getStageIndex(status: string): number {
-  const idx = STAGES.findIndex((s) => s.key === status);
-  return idx >= 0 ? idx : 0;
-}
+const STAGE_INDEX: Record<string, number> = {
+  submitted: 0,
+  acknowledged: 1,
+  investigating: 2,
+  resolved: 3,
+};
 
 interface Props {
-  status: string;
+  /** Raw incident-with-timestamps shape (createdAt, acknowledgedAt, etc.) */
+  incident: SlaIncident;
+  /** Global SLA config */
+  sla: SlaConfig;
+  /** Optional: name/email of assigned faculty to show under "Acknowledged"/"Investigating" stages */
   assignedTo?: string | null;
 }
 
-export function IncidentTimeline({ status, assignedTo }: Props) {
-  const currentIndex = getStageIndex(status);
+function formatStageTime(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function IncidentTimeline({ incident, sla, assignedTo }: Props) {
+  const status = normalizeLegacyStatus(incident.status);
+  const currentIndex = STAGE_INDEX[status] ?? 0;
+  const deadlines = computeStageDeadlines(incident, sla);
+
+  const stageStartTime = (key: (typeof STAGES)[number]['key']): Date | string | null => {
+    switch (key) {
+      case 'submitted':
+        return incident.createdAt;
+      case 'acknowledged':
+        return incident.acknowledgedAt;
+      case 'investigating':
+        return incident.investigatingAt;
+      case 'resolved':
+        return incident.resolvedAt;
+    }
+  };
 
   return (
     <Flex direction="column" gap="0" py="2">
@@ -33,6 +80,13 @@ export function IncidentTimeline({ status, assignedTo }: Props) {
         const isActive = i <= currentIndex;
         const isLast = i === STAGES.length - 1;
         const Icon = stage.icon;
+
+        const stageTime = formatStageTime(stageStartTime(stage.key));
+        const completedAt = isCompleted || (isCurrent && stageTime) ? stageTime : null;
+
+        const slaInfo = stage.slaStage ? deadlines[stage.slaStage] : null;
+        const showCountdown = slaInfo && !slaInfo.completed && isCurrent;
+        const breached = slaInfo?.breached ?? false;
 
         return (
           <Flex key={stage.key} direction="column" gap="0" align="start">
@@ -47,9 +101,17 @@ export function IncidentTimeline({ status, assignedTo }: Props) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                  background: isActive ? 'var(--accent-9)' : 'var(--gray-a4)',
-                  color: isActive ? 'white' : 'var(--gray-9)',
-                  boxShadow: isCurrent ? '0 0 0 4px var(--accent-a3)' : 'none',
+                  background: breached
+                    ? 'var(--red-9)'
+                    : isActive
+                      ? 'var(--accent-9)'
+                      : 'var(--gray-a4)',
+                  color: isActive || breached ? 'white' : 'var(--gray-9)',
+                  boxShadow: isCurrent
+                    ? breached
+                      ? '0 0 0 4px var(--red-a3)'
+                      : '0 0 0 4px var(--accent-a3)'
+                    : 'none',
                   transition: 'all 0.3s ease',
                   position: 'relative',
                   zIndex: 1,
@@ -58,27 +120,52 @@ export function IncidentTimeline({ status, assignedTo }: Props) {
                 <Icon width="18" height="18" />
               </Box>
 
-              {/* Label + subtitle */}
+              {/* Label + meta */}
               <Flex direction="column" gap="0">
-                <Text
-                  size="2"
-                  weight={isCurrent ? 'bold' : 'medium'}
-                  color={isActive ? undefined : 'gray'}
-                >
-                  {stage.label}
-                </Text>
-                {/* Show assigned faculty info on the "In Review" stage */}
-                {stage.key === 'reviewing' && isActive && assignedTo && (
+                <Flex align="center" gap="2" wrap="wrap">
+                  <Text
+                    size="2"
+                    weight={isCurrent ? 'bold' : 'medium'}
+                    color={isActive ? undefined : 'gray'}
+                  >
+                    {stage.label}
+                  </Text>
+                  {breached && (
+                    <Badge color="red" variant="solid" size="1">
+                      SLA Breached
+                    </Badge>
+                  )}
+                </Flex>
+
+                {/* Faculty info on Acknowledged + Investigating stages */}
+                {(stage.key === 'acknowledged' || stage.key === 'investigating') &&
+                  isActive &&
+                  assignedTo && (
+                    <Text size="1" color="gray">
+                      {assignedTo}
+                    </Text>
+                  )}
+
+                {/* Stage timestamp */}
+                {completedAt && (
                   <Text size="1" color="gray">
-                    {assignedTo}
+                    {completedAt}
                   </Text>
                 )}
+
+                {/* Countdown / breach indicator */}
+                {showCountdown && (
+                  <Text size="1" color={breached ? 'red' : 'blue'} weight="medium">
+                    {formatRemaining(slaInfo!.msRemaining)}
+                  </Text>
+                )}
+
                 {isCompleted && (
                   <Text size="1" color="green">
                     Done
                   </Text>
                 )}
-                {isCurrent && !isCompleted && (
+                {isCurrent && !isCompleted && !showCountdown && (
                   <Text size="1" color="blue">
                     Current
                   </Text>

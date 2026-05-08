@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/page-header';
 import { PageFooter } from '@/components/page-footer';
 import { getUserRole } from '@/lib/roles';
 import { CheckCircledIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons';
+import { getSlaConfig } from '@/app/admin-dashboard/actions';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -44,6 +45,8 @@ export default async function DashboardPage() {
   for (const a of allAssignments) {
     categoryAssignmentMap[a.category] = a.facultyEmail;
   }
+
+  const { sla } = await getSlaConfig();
 
   return (
     <div
@@ -183,6 +186,7 @@ export default async function DashboardPage() {
             <StudentIncidentDialog
               incidents={JSON.parse(JSON.stringify(incidents))}
               categoryAssignments={categoryAssignmentMap}
+              sla={sla}
             />
           )}
         </Flex>

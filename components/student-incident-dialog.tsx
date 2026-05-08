@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Badge, Box, Card, Dialog, Flex, Separator, Table, Text } from '@radix-ui/themes';
 import { Button } from '@radix-ui/themes';
 import { IncidentTimeline } from '@/components/incident-timeline';
+import { isIncidentBreached, statusLabel, type SlaConfig } from '@/lib/sla';
+import { normalizeLegacyStatus } from '@/app/faculty-dashboard/incident-validation';
 
 interface AiAnalysis {
   category: string;
@@ -27,6 +29,9 @@ interface IncidentReport {
   mediaFileName: string | null;
   aiAnalysis: AiAnalysis | null;
   status: string;
+  acknowledgedAt: string | null;
+  investigatingAt: string | null;
+  resolvedAt: string | null;
   assignedTo: string | null;
   assignedToEmail: string | null;
   createdAt: string;
@@ -36,15 +41,18 @@ interface IncidentReport {
 interface Props {
   incidents: IncidentReport[];
   categoryAssignments: Record<string, string>;
+  sla: SlaConfig;
 }
 
 function getStatusColor(status: string) {
-  switch (status) {
-    case 'pending':
+  switch (normalizeLegacyStatus(status)) {
+    case 'submitted':
       return 'blue' as const;
-    case 'reviewing':
+    case 'acknowledged':
+      return 'violet' as const;
+    case 'investigating':
       return 'orange' as const;
-    case 'closed':
+    case 'resolved':
       return 'green' as const;
     default:
       return 'gray' as const;
@@ -79,7 +87,7 @@ function shortId(id: string) {
   return id.length > 8 ? `#${id.slice(-6).toUpperCase()}` : `#${id}`;
 }
 
-export function StudentIncidentDialog({ incidents, categoryAssignments }: Props) {
+export function StudentIncidentDialog({ incidents, categoryAssignments, sla }: Props) {
   const [selected, setSelected] = useState<IncidentReport | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
 
@@ -128,8 +136,13 @@ export function StudentIncidentDialog({ incidents, categoryAssignments }: Props)
                       variant="soft"
                       style={{ textTransform: 'capitalize' }}
                     >
-                      {selected.status}
+                      {statusLabel(normalizeLegacyStatus(selected.status))}
                     </Badge>
+                    {isIncidentBreached(selected, sla) && (
+                      <Badge color="red" size="2" variant="solid">
+                        SLA Breached
+                      </Badge>
+                    )}
                   </Flex>
                 </Dialog.Title>
                 <Dialog.Description size="2" color="gray">
@@ -338,14 +351,15 @@ export function StudentIncidentDialog({ incidents, categoryAssignments }: Props)
             </Dialog.Description>
           </Box>
           <Box px="4" py="3" style={{ flex: 1, overflowY: 'auto' }}>
-            <IncidentTimeline
-              status={selected?.status ?? 'pending'}
-              assignedTo={
-                selected
-                  ? (categoryAssignments[selected.incidentType] ?? selected.assignedToEmail ?? null)
-                  : null
-              }
-            />
+            {selected && (
+              <IncidentTimeline
+                incident={selected}
+                sla={sla}
+                assignedTo={
+                  categoryAssignments[selected.incidentType] ?? selected.assignedToEmail ?? null
+                }
+              />
+            )}
           </Box>
           <Box px="4" py="3" style={{ borderTop: '1px solid var(--gray-a4)', flexShrink: 0 }}>
             <Button
@@ -405,7 +419,7 @@ export function StudentIncidentDialog({ incidents, categoryAssignments }: Props)
                       variant="soft"
                       style={{ textTransform: 'capitalize' }}
                     >
-                      {incident.status}
+                      {statusLabel(normalizeLegacyStatus(incident.status))}
                     </Badge>
                   </Table.Cell>
                   <Table.Cell>
@@ -450,14 +464,21 @@ export function StudentIncidentDialog({ incidents, categoryAssignments }: Props)
                   {incident.incidentType}
                 </Text>
               </Flex>
-              <Badge
-                color={getStatusColor(incident.status)}
-                size="1"
-                variant="soft"
-                style={{ textTransform: 'capitalize', flexShrink: 0 }}
-              >
-                {incident.status}
-              </Badge>
+              <Flex direction="column" gap="1" align="end">
+                <Badge
+                  color={getStatusColor(incident.status)}
+                  size="1"
+                  variant="soft"
+                  style={{ textTransform: 'capitalize', flexShrink: 0 }}
+                >
+                  {statusLabel(normalizeLegacyStatus(incident.status))}
+                </Badge>
+                {isIncidentBreached(incident, sla) && (
+                  <Badge color="red" size="1" variant="solid">
+                    Breached
+                  </Badge>
+                )}
+              </Flex>
             </Flex>
 
             <Separator size="4" mb="2" />

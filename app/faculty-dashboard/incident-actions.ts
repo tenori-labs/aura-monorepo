@@ -3,15 +3,16 @@
 import prisma from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { canAccessFacultyRoutes } from '@/lib/roles';
-import { isValidStatus, VALID_STATUSES } from './incident-validation';
+import {
+  isValidStatus,
+  isValidTransition,
+  normalizeLegacyStatus,
+  VALID_STATUSES,
+} from './incident-validation';
 
 /**
- * Updates the status of an incident report.
- * Requires faculty/admin authorization and performs a database update.
- *
- * @param incidentId - Unique ID of the incident report
- * @param newStatus - New status ("pending" | "reviewing" | "closed")
- * @returns { success: true } if update succeeds, or { error: string } if unauthorized, invalid status, or DB failure occurs
+ * Updates the status of an incident report, enforcing sequential transitions.
+ * Sets the corresponding stage timestamp automatically.
  */
 export async function updateIncidentStatus(incidentId: string, newStatus: string) {
   const supabase = await createClient();
@@ -27,10 +28,41 @@ export async function updateIncidentStatus(incidentId: string, newStatus: string
     return { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` };
   }
 
+  const incident = await prisma.incidentReport.findUnique({
+    where: { id: incidentId },
+    select: { status: true },
+  });
+  if (!incident) {
+    return { error: 'Incident not found.' };
+  }
+
+  const currentStatus = normalizeLegacyStatus(incident.status);
+
+  // No-op if already there.
+  if (currentStatus === newStatus) {
+    return { success: true };
+  }
+
+  if (!isValidTransition(currentStatus, newStatus)) {
+    return {
+      error: `Cannot transition from "${currentStatus}" to "${newStatus}". Stages must progress in order: submitted → acknowledged → investigating → resolved.`,
+    };
+  }
+
+  const now = new Date();
+  const stampField =
+    newStatus === 'acknowledged'
+      ? { acknowledgedAt: now }
+      : newStatus === 'investigating'
+        ? { investigatingAt: now }
+        : newStatus === 'resolved'
+          ? { resolvedAt: now }
+          : {};
+
   try {
     await prisma.incidentReport.update({
       where: { id: incidentId },
-      data: { status: newStatus },
+      data: { status: newStatus, ...stampField },
     });
     return { success: true };
   } catch (err) {
@@ -40,12 +72,28 @@ export async function updateIncidentStatus(incidentId: string, newStatus: string
 }
 
 /**
+ * Convenience action — moves a `submitted` incident to `acknowledged`.
+ */
+export async function acknowledgeIncident(incidentId: string) {
+  return updateIncidentStatus(incidentId, 'acknowledged');
+}
+
+/**
+ * Convenience action — moves an `acknowledged` incident to `investigating`.
+ */
+export async function startInvestigation(incidentId: string) {
+  return updateIncidentStatus(incidentId, 'investigating');
+}
+
+/**
+ * Convenience action — moves an `investigating` incident to `resolved`.
+ */
+export async function resolveIncident(incidentId: string) {
+  return updateIncidentStatus(incidentId, 'resolved');
+}
+
+/**
  * Updates faculty notes on an incident report.
- * Requires faculty/admin authorization and performs a database update.
- *
- * @param incidentId - Unique ID of the incident report
- * @param notes - Faculty notes to attach to the incident for review tracking
- * @returns { success: true } if update succeeds, or { error: string } if unauthorized or DB failure occurs
  */
 export async function updateIncidentNotes(incidentId: string, notes: string) {
   const supabase = await createClient();

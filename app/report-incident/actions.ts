@@ -114,7 +114,7 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
             validityReason: aiResult.validityReason,
           }
           : undefined,
-        status: 'pending',
+        status: 'submitted',
         assignedTo,
         assignedToEmail,
       },

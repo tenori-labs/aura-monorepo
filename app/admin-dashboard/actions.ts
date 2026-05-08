@@ -4,6 +4,7 @@ import prisma from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { getUserRole } from '@/lib/roles';
 import { isValidCategory, INCIDENT_CATEGORIES } from './admin-validation';
+import { DEFAULT_SLA, type SlaConfig } from '@/lib/sla';
 
 
 
@@ -178,4 +179,93 @@ export async function getFacultyUsers() {
   }));
 
   return { users };
+}
+
+// ─── SLA Configuration ───────────────────────────────────────────────
+
+/**
+ * Fetches the global SLA configuration. Anyone authenticated can read it
+ * (since the timeline shows deadlines to students and faculty too).
+ *
+ * Returns the saved config, or `DEFAULT_SLA` if no record exists yet.
+ */
+export async function getSlaConfig(): Promise<{ sla: SlaConfig }> {
+  const record = await prisma.slaConfig.findFirst({
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (!record) {
+    return { sla: DEFAULT_SLA };
+  }
+
+  return {
+    sla: {
+      acknowledgeWithinHours: record.acknowledgeWithinHours,
+      investigateWithinHours: record.investigateWithinHours,
+      resolveWithinHours: record.resolveWithinHours,
+    },
+  };
+}
+
+/**
+ * Updates the global SLA configuration. Admin-only.
+ * Upserts the single SlaConfig record.
+ */
+export async function updateSlaConfig(input: {
+  acknowledgeWithinHours: number;
+  investigateWithinHours: number;
+  resolveWithinHours: number;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || getUserRole(user) !== 'admin') {
+    return { error: 'Unauthorized' };
+  }
+
+  const { acknowledgeWithinHours, investigateWithinHours, resolveWithinHours } = input;
+
+  if (
+    !Number.isFinite(acknowledgeWithinHours) ||
+    !Number.isFinite(investigateWithinHours) ||
+    !Number.isFinite(resolveWithinHours) ||
+    acknowledgeWithinHours <= 0 ||
+    investigateWithinHours <= 0 ||
+    resolveWithinHours <= 0
+  ) {
+    return { error: 'All SLA durations must be positive integers (hours).' };
+  }
+
+  const existing = await prisma.slaConfig.findFirst({
+    orderBy: { createdAt: 'asc' },
+  });
+
+  try {
+    if (existing) {
+      await prisma.slaConfig.update({
+        where: { id: existing.id },
+        data: {
+          acknowledgeWithinHours: Math.round(acknowledgeWithinHours),
+          investigateWithinHours: Math.round(investigateWithinHours),
+          resolveWithinHours: Math.round(resolveWithinHours),
+          updatedBy: user.email ?? user.id,
+        },
+      });
+    } else {
+      await prisma.slaConfig.create({
+        data: {
+          acknowledgeWithinHours: Math.round(acknowledgeWithinHours),
+          investigateWithinHours: Math.round(investigateWithinHours),
+          resolveWithinHours: Math.round(resolveWithinHours),
+          updatedBy: user.email ?? user.id,
+        },
+      });
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to update SLA config:', err);
+    return { error: 'Failed to save SLA configuration.' };
+  }
 }

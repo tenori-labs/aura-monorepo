@@ -8,6 +8,7 @@
     "start": "next start",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
+    "db:migrate-statuses": "ts-node --project tsconfig.scripts.json scripts/migrate-incident-statuses.ts",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test": "jest"
