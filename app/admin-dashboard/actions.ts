@@ -51,20 +51,32 @@ export async function assignCategory(category: string, facultyId: string, facult
     return { error: 'Invalid category' };
   }
 
-  await prisma.categoryAssignment.upsert({
+  // TODO(multitenancy): the compound unique on CategoryAssignment is
+  // (tenantId, category). Once user → tenant resolution is wired up, switch
+  // this back to a real upsert with the compound key. For now we operate
+  // single-tenant, so a findFirst + update/create is correct.
+  const existing = await prisma.categoryAssignment.findFirst({
     where: { category },
-    update: {
-      facultyId,
-      facultyEmail: facultyName,
-      assignedBy: user.email ?? user.id,
-    },
-    create: {
-      category,
-      facultyId,
-      facultyEmail: facultyName,
-      assignedBy: user.email ?? user.id,
-    },
   });
+  if (existing) {
+    await prisma.categoryAssignment.update({
+      where: { id: existing.id },
+      data: {
+        facultyId,
+        facultyEmail: facultyName,
+        assignedBy: user.email ?? user.id,
+      },
+    });
+  } else {
+    await prisma.categoryAssignment.create({
+      data: {
+        category,
+        facultyId,
+        facultyEmail: facultyName,
+        assignedBy: user.email ?? user.id,
+      },
+    });
+  }
 
   return { success: true };
 }
@@ -77,13 +89,15 @@ export async function removeAssignment(category: string) {
   if ('error' in auth) return auth;
 
   try {
-    const assignment = await prisma.categoryAssignment.findUnique({
+    const assignment = await prisma.categoryAssignment.findFirst({
       where: { category },
     });
 
-    await prisma.categoryAssignment.delete({
-      where: { category },
-    });
+    if (assignment) {
+      await prisma.categoryAssignment.delete({
+        where: { id: assignment.id },
+      });
+    }
 
     if (assignment) {
       await prisma.incidentReport.updateMany({

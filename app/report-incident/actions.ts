@@ -59,7 +59,10 @@ export async function submitIncident(prevState: unknown, formData: FormData) {
   let assignedTo: string | null = null;
   let assignedToEmail: string | null = null;
   try {
-    const assignment = await prisma.categoryAssignment.findUnique({
+    // TODO(multitenancy): scope to user's tenant once user → tenant
+    // resolution lands. Today the app is single-tenant so findFirst is
+    // correct (only one row per category exists).
+    const assignment = await prisma.categoryAssignment.findFirst({
       where: { category: type },
     });
     if (assignment) {

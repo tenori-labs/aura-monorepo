@@ -6,9 +6,16 @@ import {
   SHARED_ROUTES,
   getDashboardPathForRole,
 } from '@/lib/roles';
+import { CONSOLE_COOKIE_NAME, verifyConsoleToken } from '@/lib/console-auth';
 
 const isAuthPage = createRouteMatcher(['/', '/signup']);
 const isWebhookRoute = createRouteMatcher(['/api/webhooks(.*)']);
+
+// Super-admin console routes. These bypass Clerk entirely and use the
+// MVP password gate in `lib/console-auth.ts`.
+const isConsoleRoute = createRouteMatcher(['/console(.*)']);
+const isConsoleLogin = createRouteMatcher(['/console/login(.*)']);
+const isConsoleApi = createRouteMatcher(['/api/console(.*)']);
 
 const isAdminOnlyRoute = createRouteMatcher(ADMIN_ONLY_ROUTES.map((r) => `${r}(.*)`));
 const isFacultyRoute = createRouteMatcher(FACULTY_ROUTES.map((r) => `${r}(.*)`));
@@ -44,6 +51,24 @@ function readRoleFromClaims(sessionClaims: unknown): string | null {
 export default clerkMiddleware(async (auth, req) => {
   // Webhook routes must be public — never run auth on them.
   if (isWebhookRoute(req)) return;
+
+  // Console routes are gated by the MVP password cookie (not Clerk).
+  if (isConsoleRoute(req) && !isConsoleLogin(req)) {
+    const token = req.cookies.get(CONSOLE_COOKIE_NAME)?.value;
+    if (!verifyConsoleToken(token)) {
+      return NextResponse.redirect(new URL('/console/login', req.url));
+    }
+    return; // authenticated console user — skip the rest of the Clerk flow
+  }
+
+  // Console API routes get a JSON 401 instead of a redirect.
+  if (isConsoleApi(req)) {
+    const token = req.cookies.get(CONSOLE_COOKIE_NAME)?.value;
+    if (!verifyConsoleToken(token)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return;
+  }
 
   const { userId, sessionClaims } = await auth();
 
