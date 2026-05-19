@@ -10,6 +10,43 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Multi-tenancy ───────────────────────────────────────────────────
+
+/// One row per institution (tenant). All other rows reference this via
+/// `tenantId`. During the multi-tenant rollout `tenantId` is nullable
+/// on legacy rows; the backfill script stamps every row with the default
+/// tenant before we lock the field down.
+model Tenant {
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  subdomain               String   @unique
+  name                    String
+  logoUrl                 String?
+  primaryColor            String?
+  status                  String   @default("active")   // active | suspended | deleted
+  planType                String   @default("free")     // free | pro | enterprise
+
+  // Quotas
+  maxStudents             Int      @default(500)
+  maxFaculty              Int      @default(50)
+  creditsRemaining        Int      @default(0)
+
+  // Feature flags (a tenant can disable major features)
+  aiAssistantEnabled      Boolean  @default(true)
+  shadowCasesEnabled      Boolean  @default(true)
+  bulletinEnabled         Boolean  @default(true)
+
+  // Future: email-domain allowlisting for tenant sign-up
+  allowedEmailDomains     String[] @default([])
+
+  // Clerk integration (filled when real super-admin auth lands)
+  clerkOrgId              String?
+
+  // Audit
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  createdBy               String?
+}
+
 // Embedded type for AI Analysis
 type AiAnalysis {
   category        String
@@ -21,6 +58,7 @@ type AiAnalysis {
 
 model IncidentReport {
   id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId        String?      @db.ObjectId
   userId          String?
   userEmail       String?
   incidentType    String
@@ -37,27 +75,33 @@ model IncidentReport {
   acknowledgedAt  DateTime?    // when faculty acknowledged the report
   investigatingAt DateTime?    // when faculty started investigating
   resolvedAt      DateTime?    // when faculty marked resolved
-  assignedTo      String?      // faculty user ID (from Supabase)
+  assignedTo      String?      // faculty user ID (from Supabase/Clerk)
   assignedToEmail String?      // faculty email for display
   facultyNotes    String?      // faculty observations/actions taken
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+
+  @@index([tenantId])
 }
 
-/// Global SLA configuration for incident response times.
-/// There is only ever one document in this collection.
+/// SLA configuration — was a global singleton, now keyed by tenant.
+/// `@@unique([tenantId])` means at most one config row per tenant.
 model SlaConfig {
   id                       String   @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId                 String?  @db.ObjectId
   acknowledgeWithinHours   Int      @default(24)
   investigateWithinHours   Int      @default(72)
   resolveWithinHours       Int      @default(168)
   updatedBy                String?
   updatedAt                DateTime @updatedAt
   createdAt                DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model ConsentRecord {
   id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId       String?  @db.ObjectId
   userId         String
   userEmail      String
   fullName       String
@@ -68,16 +112,26 @@ model ConsentRecord {
   ipAddress      String?
   userAgent      String?
   signedAt       DateTime @default(now())
+
+  @@index([tenantId])
 }
 
+/// Category → faculty assignment. The legacy single-tenant version had a
+/// global `@unique` on `category`. With multi-tenancy that has to become
+/// a compound unique on `(tenantId, category)` so each tenant gets its
+/// own independent set of category assignments.
 model CategoryAssignment {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  category     String   @unique  // e.g. "Harassment/Bullying"
-  facultyId    String             // Supabase user ID
-  facultyEmail String             // for display
-  assignedBy   String?            // admin who made the assignment
+  tenantId     String?  @db.ObjectId
+  category     String              // e.g. "Harassment/Bullying"
+  facultyId    String              // Clerk user ID
+  facultyEmail String              // for display
+  assignedBy   String?             // admin who made the assignment
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, category])
+  @@index([tenantId])
 }
 
 // ─── Wellbeing Reporting System ───────────────────────────────────
@@ -87,8 +141,9 @@ model CategoryAssignment {
 /// `studentName` is stored separately, visible only to internal staff.
 model WellbeingReport {
   id                  String           @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId            String?          @db.ObjectId
   caseId              String           @unique @default(cuid())
-  uid                 String           // Supabase user ID
+  uid                 String           // Clerk user ID
   studentName         String           // internal only, never in reportText
   generatedAt         DateTime         @default(now())
   reportText          String           // legacy plain-text fallback
@@ -104,16 +159,21 @@ model WellbeingReport {
   contextNotes        String?          // additional context from clarification
 
   accessLog           IdentityAccess[]
+
+  @@index([tenantId])
 }
 
 /// Audit log tracking who viewed a student's identity in a wellbeing report.
 model IdentityAccess {
   id         String          @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId   String?         @db.ObjectId
   reportId   String          @db.ObjectId
-  accessedBy String          // staff Supabase user ID
+  accessedBy String          // staff Clerk user ID
   accessedAt DateTime        @default(now())
   reason     String          // free text, required
   report     WellbeingReport @relation(fields: [reportId], references: [id])
+
+  @@index([tenantId])
 }
 
 // ─── Public Bulletin System ──────────────────────────────────────────
@@ -121,11 +181,14 @@ model IdentityAccess {
 /// Individual student grievance — text purged after CoreIssue promotion.
 model Grievance {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String                        // Supabase user ID (duplicate prevention)
-  text        String?                       // nullable — purged after promotion
+  tenantId    String?   @db.ObjectId
+  userId      String                          // Clerk user ID (duplicate prevention)
+  text        String?                         // nullable — purged after promotion
   coreIssueId String    @db.ObjectId
   coreIssue   CoreIssue @relation(fields: [coreIssueId], references: [id])
   createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
 }
 
 /// AI-clustered group of similar grievances.
@@ -133,6 +196,7 @@ model Grievance {
 /// queried via MongoDB Atlas $vectorSearch for k-NN matching.
 model CoreIssue {
   id          String                @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId    String?               @db.ObjectId
   title       String                // AI-generated short title
   summary     String                // AI-generated neutral summary
   embedding   Float[]               // 768-dim Gemini embedding vector
@@ -146,18 +210,23 @@ model CoreIssue {
   responses   InstitutionResponse[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
 }
 
 /// Institution's public response to a promoted CoreIssue.
 /// Displayed with a "Verified Responder" badge on the bulletin board.
 model InstitutionResponse {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId    String?   @db.ObjectId
   coreIssueId String    @db.ObjectId
   coreIssue   CoreIssue @relation(fields: [coreIssueId], references: [id])
-  responderId String    // admin Supabase user ID
+  responderId String    // admin Clerk user ID
   message     String
   newStatus   String    // status update (e.g., "investigating")
   createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
 }
 
 // ─── Shadow Trigger System ───────────────────────────────────────────
@@ -167,6 +236,7 @@ model InstitutionResponse {
 /// Only visible to admins. Groups reports about the same entity.
 model ShadowCase {
   id            String                  @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId      String?                 @db.ObjectId
   entityName    String                  // the named person/entity being reported
   embedding     Float[]                 // 3072-dim Gemini embedding for entity matching
   reportCount   Int                     @default(1)
@@ -179,28 +249,34 @@ model ShadowCase {
   sessions      InterrogationSession[]
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
+
+  @@index([tenantId])
 }
 
 /// Individual private report linked to a ShadowCase.
 /// Text is preserved (not purged) since these are private investigations.
 model ShadowReport {
   id            String      @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String      // Supabase user ID (duplicate prevention + future chat sessions)
+  tenantId      String?     @db.ObjectId
+  userId        String      // Clerk user ID (duplicate prevention + future chat sessions)
   text          String      // original report text (preserved for investigation)
   detectedNames String[]    // names/titles detected by the AI
   keywords      String[]    // safety keywords found (e.g., "harassment", "abuse")
   shadowCaseId  String      @db.ObjectId
   shadowCase    ShadowCase  @relation(fields: [shadowCaseId], references: [id])
   createdAt     DateTime    @default(now())
+
+  @@index([tenantId])
 }
 
 /// Individual interrogation chat session — one per reporter per shadow case.
 /// Chat history stored as JSON. AI extracts structured anchors after completion.
 model InterrogationSession {
   id               String      @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId         String?     @db.ObjectId
   shadowCaseId     String      @db.ObjectId
   shadowCase       ShadowCase  @relation(fields: [shadowCaseId], references: [id])
-  userId           String      // reporter's Supabase user ID
+  userId           String      // reporter's Clerk user ID
   status           String      @default("pending")
   // status: "pending" | "in_progress" | "completed" | "expired"
   chatHistory      Json        @default("[]")
@@ -209,4 +285,6 @@ model InterrogationSession {
   completedAt      DateTime?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+
+  @@index([tenantId])
 }

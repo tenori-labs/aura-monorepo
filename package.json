@@ -9,6 +9,7 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate-statuses": "ts-node --project tsconfig.scripts.json scripts/migrate-incident-statuses.ts",
+    "db:migrate-multitenant": "ts-node --project tsconfig.scripts.json scripts/migrate-to-multitenant.ts",
     "migrate:users-to-clerk": "ts-node --project tsconfig.scripts.json scripts/migrate-users-to-clerk.ts",
     "migrate:remap-user-ids": "ts-node --project tsconfig.scripts.json scripts/remap-user-ids.ts",
     "lint": "eslint",
