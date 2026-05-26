@@ -12,6 +12,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { createHmac } from 'crypto';
+
 const results: { name: string; ok: boolean; detail?: string }[] = [];
 
 function check(name: string, fn: () => void | Promise<void>): Promise<void> {
@@ -179,7 +181,6 @@ async function main() {
 
   await check('verifyConsoleToken: rejects expired token', () => {
     // Manually craft an expired token using the same secret.
-    const { createHmac } = require('crypto');
     const nonce = 'deadbeef';
     const expiry = String(Math.floor(Date.now() / 1000) - 1); // already expired
     const body = `${nonce}.${expiry}`;
