@@ -55,6 +55,9 @@ export async function getShadowCaseDetail(caseId: string) {
 
     const shadowCase = await prisma.shadowCase.findUnique({
         where: { id: caseId },
+        // `embedding` is a 3072-element Float[] used only for vector search.
+        // Never needed by the admin UI; omit so we don't ship ~40 KB per request.
+        omit: { embedding: true },
         include: {
             reports: {
                 orderBy: { createdAt: 'desc' },
@@ -117,6 +120,15 @@ export async function updateShadowCaseStatus(caseId: string, newStatus: string) 
  * @param shadowCaseId - The ShadowCase ID to initiate interrogation for
  */
 export async function triggerInterrogation(shadowCaseId: string) {
+    // Fetch the shadow case so we can propagate its tenantId onto each
+    // new interrogation session. Without this, sessions land with a null
+    // tenant and become invisible to tenant-scoped reads.
+    const shadowCase = await prisma.shadowCase.findUnique({
+        where: { id: shadowCaseId },
+        select: { tenantId: true },
+    });
+    const tenantId = shadowCase?.tenantId ?? null;
+
     // Get all unique reporters for this case
     const reports = await prisma.shadowReport.findMany({
         where: { shadowCaseId },
@@ -130,6 +142,7 @@ export async function triggerInterrogation(shadowCaseId: string) {
         userId: r.userId,
         status: 'pending',
         chatHistory: [],
+        tenantId,
     }));
 
     await prisma.interrogationSession.createMany({

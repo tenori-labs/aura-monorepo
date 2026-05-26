@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/server';
+import { requireCurrentUserTenantId } from '@/lib/auth/tenant';
 import { isAdmin } from '@/lib/roles';
 import { isValidGrievance, isValidIssueStatus } from './bulletin-validation';
 import { embedText } from '@/lib/ai/embedding';
@@ -43,13 +44,17 @@ export async function submitGrievance(formData: FormData) {
     }
 
     try {
+        // Resolve tenant up front — every row we create below must be stamped
+        // with it so the tenant-scoped reads can find them later.
+        const tenantId = await requireCurrentUserTenantId();
+
         // 3. Shadow trigger check — detect personal names and safety keywords
         const { detectShadowTrigger } = await import('@/lib/ai/flows/shadow-trigger');
         const shadowResult = await detectShadowTrigger({ grievanceText: text.trim() });
 
         if (shadowResult.isShadow) {
             // ── Diverted to private ShadowCase ──
-            return await handleShadowReport(user.id, text.trim(), shadowResult);
+            return await handleShadowReport(user.id, text.trim(), shadowResult, tenantId);
         }
 
         // 4. Normal bulletin pipeline (no shadow trigger detected)
@@ -76,7 +81,7 @@ export async function submitGrievance(formData: FormData) {
 
             // Create grievance + increment count
             await prisma.grievance.create({
-                data: { userId: user.id, text: text.trim(), coreIssueId: match.id },
+                data: { userId: user.id, text: text.trim(), coreIssueId: match.id, tenantId },
             });
 
             const updated = await prisma.coreIssue.update({
@@ -101,11 +106,12 @@ export async function submitGrievance(formData: FormData) {
                     summary,
                     embedding,
                     uniqueCount: 1,
+                    tenantId,
                 },
             });
 
             await prisma.grievance.create({
-                data: { userId: user.id, text: text.trim(), coreIssueId: coreIssue.id },
+                data: { userId: user.id, text: text.trim(), coreIssueId: coreIssue.id, tenantId },
             });
 
             clearPIISession(sessionId);
@@ -134,7 +140,8 @@ export async function submitGrievance(formData: FormData) {
 async function handleShadowReport(
     userId: string,
     text: string,
-    shadowResult: { detectedNames: string[]; keywords: string[]; entityName: string }
+    shadowResult: { detectedNames: string[]; keywords: string[]; entityName: string },
+    tenantId: string
 ) {
     // Build enriched embedding context for better semantic resolution.
     // Short entity names (e.g., "A staff") produce noisy embeddings, so we
@@ -182,6 +189,7 @@ async function handleShadowReport(
                 detectedNames: shadowResult.detectedNames,
                 keywords: shadowResult.keywords,
                 shadowCaseId: matchedCase.id,
+                tenantId,
             },
         });
 
@@ -198,7 +206,7 @@ async function handleShadowReport(
 
         return { success: true, isNew: false };
     } else {
-        return await createNewShadowCase(userId, text, shadowResult, embedding);
+        return await createNewShadowCase(userId, text, shadowResult, embedding, tenantId);
     }
 }
 
@@ -209,13 +217,15 @@ async function createNewShadowCase(
     userId: string,
     text: string,
     shadowResult: { detectedNames: string[]; keywords: string[]; entityName: string },
-    embedding: number[]
+    embedding: number[],
+    tenantId: string
 ) {
     const shadowCase = await prisma.shadowCase.create({
         data: {
             entityName: shadowResult.entityName,
             embedding,
             reportCount: 1,
+            tenantId,
         },
     });
 
@@ -226,6 +236,7 @@ async function createNewShadowCase(
             detectedNames: shadowResult.detectedNames,
             keywords: shadowResult.keywords,
             shadowCaseId: shadowCase.id,
+            tenantId,
         },
     });
 
@@ -269,6 +280,10 @@ export async function getPublicIssues() {
 
     const issues = await prisma.coreIssue.findMany({
         where: { isPromoted: true },
+        // `embedding` is a 768-element Float[] used only for vector search.
+        // Never rendered to the bulletin; omit at the query level so we don't
+        // even fetch it from MongoDB.
+        omit: { embedding: true },
         orderBy: { promotedAt: 'desc' },
         include: {
             responses: {
@@ -278,11 +293,7 @@ export async function getPublicIssues() {
         },
     });
 
-    // Strip embeddings from response (large arrays, not needed by UI)
-    return issues.map((issue) => ({
-        ...issue,
-        embedding: undefined,
-    }));
+    return issues;
 }
 
 // ─── Get Pending Count ───────────────────────────────────────────────
