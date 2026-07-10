@@ -9,5 +9,5 @@ export const ai = genkit({
   plugins: [googleAI()],
   // PINNED: Do not change without re-validating self-harm detection prompts.
   // Last validated: 2026-02-19
-  model: 'googleai/gemini-2.0-flash-001',
+  model: 'googleai/gemini-2.5-flash',
 });
