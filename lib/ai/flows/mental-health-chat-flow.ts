@@ -196,7 +196,7 @@ const mentalHealthChatFlow = ai.defineFlow(
       };
 
       const { output } = await ai.generate({
-        model: 'googleai/gemini-2.0-flash-001',
+        model: 'googleai/gemini-2.5-flash',
         messages: [...formattedHistory, formattedNewMessage],
         system: systemPrompt,
         output: { schema: GenerationSchema },

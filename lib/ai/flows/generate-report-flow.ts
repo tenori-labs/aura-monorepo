@@ -34,7 +34,7 @@ export async function generateNeutralReport(
 
   try {
     const result = await ai.generate({
-      model: 'googleai/gemini-2.0-flash-001',
+      model: 'googleai/gemini-2.5-flash',
       prompt: `You are a wellbeing report generator for a university student support system. Generate a structured JSON report based on the following themes and context. This will be read by an administrator who needs clear, actionable information.
 
 Rules:

@@ -53,7 +53,7 @@ export const clarifyDistress = ai.defineFlow(
 
     try {
       const { output } = await ai.generate({
-        model: 'googleai/gemini-2.0-flash-001',
+        model: 'googleai/gemini-2.5-flash',
         prompt: `A student's earlier message was flagged as a possible self-harm signal.
 They were gently asked "are you having thoughts of harming yourself?" and responded.
 
