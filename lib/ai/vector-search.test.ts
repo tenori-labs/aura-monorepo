@@ -20,6 +20,15 @@ jest.mock('next/headers', () => ({
     }),
 }));
 
+// Mock tenant resolver — vector-search.ts derives tenantId server-side
+// from the logged-in user. In tests we stub a fixed tenant so the network
+// path is exercised end-to-end without hitting Clerk or Prisma.
+const MOCK_TENANT_ID = 'tenant-test-1';
+jest.mock('@/lib/auth/tenant', () => ({
+    requireCurrentUserTenantId: jest.fn().mockResolvedValue('tenant-test-1'),
+    getCurrentUserTenantId: jest.fn().mockResolvedValue('tenant-test-1'),
+}));
+
 // Mock global fetch
 const mockFetch = jest.fn();
 global.fetch = mockFetch as any;
@@ -199,7 +208,7 @@ describe('findNearestIssue', () => {
                 headers: expect.objectContaining({
                     'Content-Type': 'application/json',
                 }),
-                body: JSON.stringify({ queryEmbedding: fakeEmbedding }),
+                body: JSON.stringify({ queryEmbedding: fakeEmbedding, tenantId: MOCK_TENANT_ID }),
             })
         );
     });
@@ -296,7 +305,7 @@ describe('findNearestShadowCase', () => {
             'http://localhost:3000/api/vector-search/shadow',
             expect.objectContaining({
                 method: 'POST',
-                body: JSON.stringify({ queryEmbedding: fakeEmbedding }),
+                body: JSON.stringify({ queryEmbedding: fakeEmbedding, tenantId: MOCK_TENANT_ID }),
             })
         );
     });

@@ -14,11 +14,14 @@ import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 export const CONSOLE_COOKIE_NAME = 'console_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
+export const CONSOLE_PASSWORD_MIN_LENGTH = 16;
+export const CONSOLE_SESSION_SECRET_MIN_LENGTH = 32;
+
 function getSecret(): string {
   const secret = process.env.CONSOLE_SESSION_SECRET;
-  if (!secret || secret.length < 16) {
+  if (!secret || secret.length < CONSOLE_SESSION_SECRET_MIN_LENGTH) {
     throw new Error(
-      'CONSOLE_SESSION_SECRET is missing or too short (need ≥16 chars). Set it in your env.'
+      `CONSOLE_SESSION_SECRET is missing or too short (need ≥${CONSOLE_SESSION_SECRET_MIN_LENGTH} chars). Set it in your env.`
     );
   }
   return secret;
@@ -28,6 +31,11 @@ function getPassword(): string {
   const pw = process.env.CONSOLE_PASSWORD;
   if (!pw) {
     throw new Error('CONSOLE_PASSWORD is not set in env.');
+  }
+  if (pw.length < CONSOLE_PASSWORD_MIN_LENGTH) {
+    throw new Error(
+      `CONSOLE_PASSWORD is too short (need ≥${CONSOLE_PASSWORD_MIN_LENGTH} chars).`
+    );
   }
   return pw;
 }
@@ -84,8 +92,14 @@ export function verifyConsoleToken(token: string | undefined | null): boolean {
  */
 export const consoleCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  // Always secure unless explicitly developing on localhost. The console
+  // is admin-only — we never want this cookie to ride a plaintext connection.
+  secure: process.env.NODE_ENV !== 'development',
+  // `strict` blocks the cookie from being sent on cross-site requests of any
+  // kind, including top-level navigations. The console has no legitimate
+  // cross-site entry point, so this is the right ceiling — it stops CSRF
+  // and reflected-attack vectors against admin actions.
+  sameSite: 'strict' as const,
   path: '/',
   maxAge: SESSION_TTL_SECONDS,
 };

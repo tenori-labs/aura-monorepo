@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ObjectId } from 'mongodb';
 import clientPromise from '@/lib/mongodb';
 import { auth } from '@clerk/nextjs/server';
 import { rateLimit, getRequestIP } from '@/lib/rate-limit';
+import { getCurrentUserTenantId } from '@/lib/auth/tenant';
 
 /**
  * POST /api/vector-search/shadow
  *
  * Internal API route for Atlas Vector Search on the ShadowCase collection.
- * Requires an authenticated Supabase session.
+ * Requires an authenticated Clerk session.
  *
- * Body: { queryEmbedding: number[] }
+ * Tenant scope: results are filtered to the caller's tenant via a `$match`
+ * stage immediately after `$vectorSearch`. Tenant ID is derived server-side
+ * from the session — body-supplied tenant IDs are ignored to prevent
+ * cross-tenant leakage.
+ *
+ * Body: { queryEmbedding: number[] }   // tenantId in body is ignored
  * Returns: { results: Array<{ _id, entityName, score }> }
  */
 export async function POST(req: NextRequest) {
@@ -18,6 +25,13 @@ export async function POST(req: NextRequest) {
         const { userId } = await auth();
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Tenant scope — derived from the session, NOT from the request body.
+        // Trusting body input here would let a caller probe other tenants.
+        const tenantId = await getCurrentUserTenantId();
+        if (!tenantId) {
+            return NextResponse.json({ error: 'No tenant for current user' }, { status: 403 });
         }
 
         const { queryEmbedding } = await req.json();
@@ -46,6 +60,10 @@ export async function POST(req: NextRequest) {
         const client = await clientPromise;
         const db = client.db('aura');
 
+        // numCandidates bumped 50→200 to compensate for the post-filter.
+        // See note on the CoreIssue route — same pattern, same TODO.
+        // TODO(atlas-index): rebuild `shadow_vector_index` with tenantId as
+        // a filter field, then move scope into $vectorSearch.filter.
         const results = await db
             .collection('ShadowCase')
             .aggregate([
@@ -54,10 +72,16 @@ export async function POST(req: NextRequest) {
                         index: 'shadow_vector_index',
                         path: 'embedding',
                         queryVector: queryEmbedding,
-                        numCandidates: 50,
-                        limit: 5,
+                        numCandidates: 200,
+                        limit: 20,
                     },
                 },
+                {
+                    $match: {
+                        tenantId: new ObjectId(tenantId),
+                    },
+                },
+                { $limit: 5 },
                 {
                     $project: {
                         _id: 1,

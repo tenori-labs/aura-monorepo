@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { requireCurrentUserTenantId } from '@/lib/auth/tenant';
 
 /**
  * Result of a vector search match against the CoreIssue collection.
@@ -46,6 +47,11 @@ export async function findNearestIssue(
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const cookieStore = await cookies();
 
+        // Tenant is derived server-side from the logged-in user — callers do
+        // not pass it in. This guarantees vector results stay scoped to the
+        // user's institution.
+        const tenantId = await requireCurrentUserTenantId();
+
         const effectiveThreshold = textLength != null
             ? adaptiveThreshold(threshold, textLength)
             : threshold;
@@ -56,7 +62,7 @@ export async function findNearestIssue(
                 'Content-Type': 'application/json',
                 Cookie: cookieStore.toString(),
             },
-            body: JSON.stringify({ queryEmbedding }),
+            body: JSON.stringify({ queryEmbedding, tenantId }),
         });
 
         if (!response.ok) {
@@ -105,6 +111,11 @@ export async function findNearestShadowCases(
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const cookieStore = await cookies();
 
+        // Tenant is derived server-side from the logged-in user — callers do
+        // not pass it in. This guarantees vector results stay scoped to the
+        // user's institution.
+        const tenantId = await requireCurrentUserTenantId();
+
         const effectiveThreshold = textLength != null
             ? adaptiveThreshold(threshold, textLength)
             : threshold;
@@ -115,7 +126,7 @@ export async function findNearestShadowCases(
                 'Content-Type': 'application/json',
                 Cookie: cookieStore.toString(),
             },
-            body: JSON.stringify({ queryEmbedding }),
+            body: JSON.stringify({ queryEmbedding, tenantId }),
         });
 
         if (!response.ok) {
